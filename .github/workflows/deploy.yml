@@ -31,7 +31,8 @@ jobs:
             fi
             git fetch origin main
             git reset --hard origin/main
-            chown -R 1000:1000 "$DEPLOY_PATH"
+            mkdir -p "$DEPLOY_PATH/var" "$DEPLOY_PATH/vendor"
+            chown -R 1000:1000 "$DEPLOY_PATH/var" "$DEPLOY_PATH/vendor"
             export APP_ENV=prod
             docker ps -aq --filter label=com.docker.compose.project=root | xargs -r docker rm -f || true
             docker ps -aq --filter label=com.docker.compose.project=arhivarius | xargs -r docker rm -f || true
