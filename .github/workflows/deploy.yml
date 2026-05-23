@@ -31,6 +31,8 @@ jobs:
             fi
             git fetch origin main
             git reset --hard origin/main
+            docker ps -aq --filter label=com.docker.compose.project=root | xargs -r docker rm -f || true
+            docker ps -aq --filter label=com.docker.compose.project=arhivarius | xargs -r docker rm -f || true
             docker ps -aq --filter name=genarchive | xargs -r docker rm -f || true
             docker compose down --remove-orphans
             docker compose build
