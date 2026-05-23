@@ -5,6 +5,16 @@ COMPOSER  = $(DC) run --rm php composer
 
 .DEFAULT_GOAL := help
 
+##@ Деплой
+
+deploy: ## Деплой на сервере: пересборка образов, миграции, прогрев кэша
+	$(DC) build
+	$(DC) up -d --remove-orphans
+	$(DC) exec -T php composer install --no-dev --optimize-autoloader --no-interaction
+	$(DC) exec -T php bin/console doctrine:migrations:migrate -n
+	$(DC) exec -T php bin/console cache:clear
+	$(DC) exec -T php bin/console cache:warmup
+
 ##@ Запуск
 
 up: ## Поднять все контейнеры
@@ -117,7 +127,8 @@ help: ## Показать эту справку
 	/^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } \
 	/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 
-.PHONY: up down restart build build-no-cache logs logs-php \
+.PHONY: deploy \
+        up down restart build build-no-cache logs logs-php \
         install update require require-dev \
         db-migrate db-rollback db-status db-diff db-generate db-fixtures db-reset \
         cc warmup routes services make-entity make-controller make-migration stan \
