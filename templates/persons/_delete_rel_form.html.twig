@@ -1,0 +1,8 @@
+<form method="post" action="{{ path('genealogy_relation_delete', {id: rel.id}) }}" class="d-inline ms-2"
+      onsubmit="return confirm('Удалить связь?');">
+    <input type="hidden" name="_token" value="{{ csrf_token('delete-rel-' ~ rel.id) }}">
+    <input type="hidden" name="return_to" value="{{ person_id }}">
+    <button class="btn btn-sm btn-link text-danger p-0">
+        <i class="bi bi-x"></i>
+    </button>
+</form>

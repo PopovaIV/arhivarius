@@ -1,0 +1,220 @@
+{% extends 'base.html.twig' %}
+{% block title %}Корзина — Админ{% endblock %}
+
+{% block body %}
+<h2 class="mb-3"><i class="bi bi-trash"></i> Корзина</h2>
+<p class="text-muted">Удалённые материалы видны только администратору.</p>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#docs-trash">
+            <i class="bi bi-folder"></i> Документы <span class="badge bg-secondary">{{ documents|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#books-trash">
+            <i class="bi bi-book"></i> Книги <span class="badge bg-secondary">{{ books|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#photos-trash">
+            <i class="bi bi-images"></i> Фото <span class="badge bg-secondary">{{ photos|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#persons-trash">
+            <i class="bi bi-people"></i> Люди <span class="badge bg-secondary">{{ persons|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#links-trash">
+            <i class="bi bi-link-45deg"></i> Ссылки <span class="badge bg-secondary">{{ links|length }}</span>
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    {# ============ Документы ============ #}
+    <div class="tab-pane fade show active" id="docs-trash">
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>Документ</th><th>Категория</th><th>Кто удалил</th><th>Когда</th><th>Файлов</th><th class="text-end"></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for d in documents %}
+                        <tr>
+                            <td><div class="fw-semibold">{{ d.title }}</div></td>
+                            <td><i class="bi {{ d.category.icon }}"></i> {{ d.category.label }}</td>
+                            <td>{{ d.deletedBy ? d.deletedBy.displayName : '—' }}</td>
+                            <td class="small text-muted">{{ d.deletedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-center">{{ d.files|length }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ path('admin_trash_restore', {id: d.id}) }}" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('restore-doc-' ~ d.id) }}">
+                                    <button class="btn btn-sm btn-outline-success"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                </form>
+                                <form method="post" action="{{ path('admin_trash_purge', {id: d.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('УДАЛИТЬ ОКОНЧАТЕЛЬНО?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('purge-doc-' ~ d.id) }}">
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="text-center text-muted py-5">Корзина пуста</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ============ Книги ============ #}
+    <div class="tab-pane fade" id="books-trash">
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>Книга</th><th>Авторы</th><th>Кто удалил</th><th>Когда</th><th>Файлов</th><th class="text-end"></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for b in books %}
+                        <tr>
+                            <td><div class="fw-semibold">{{ b.title }}</div></td>
+                            <td>{{ b.authors ?? '—' }}</td>
+                            <td>{{ b.deletedBy ? b.deletedBy.displayName : '—' }}</td>
+                            <td class="small text-muted">{{ b.deletedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-center">{{ b.files|length }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ path('admin_trash_restore_book', {id: b.id}) }}" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('restore-book-' ~ b.id) }}">
+                                    <button class="btn btn-sm btn-outline-success"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                </form>
+                                <form method="post" action="{{ path('admin_trash_purge_book', {id: b.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('УДАЛИТЬ ОКОНЧАТЕЛЬНО?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('purge-book-' ~ b.id) }}">
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="text-center text-muted py-5">Корзина пуста</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ============ Фото ============ #}
+    <div class="tab-pane fade" id="photos-trash">
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>Фото</th><th>Когда снято</th><th>Кто удалил</th><th>Когда</th><th class="text-end"></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for ph in photos %}
+                        <tr>
+                            <td><div class="fw-semibold">{{ ph.title }}</div></td>
+                            <td class="small text-muted">{{ ph.takenDate ?? (ph.takenYear ?? '—') }}</td>
+                            <td>{{ ph.deletedBy ? ph.deletedBy.displayName : '—' }}</td>
+                            <td class="small text-muted">{{ ph.deletedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ path('admin_trash_restore_photo', {id: ph.id}) }}" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('restore-photo-' ~ ph.id) }}">
+                                    <button class="btn btn-sm btn-outline-success"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                </form>
+                                <form method="post" action="{{ path('admin_trash_purge_photo', {id: ph.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('УДАЛИТЬ ОКОНЧАТЕЛЬНО?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('purge-photo-' ~ ph.id) }}">
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-center text-muted py-5">Корзина пуста</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ============ Люди ============ #}
+    <div class="tab-pane fade" id="persons-trash">
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>Имя</th><th>Годы жизни</th><th>Кто удалил</th><th>Когда</th><th class="text-end"></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for pp in persons %}
+                        <tr>
+                            <td><div class="fw-semibold">{{ pp.fullName }}</div></td>
+                            <td class="small text-muted">{{ pp.lifespanLabel }}</td>
+                            <td>{{ pp.deletedBy ? pp.deletedBy.displayName : '—' }}</td>
+                            <td class="small text-muted">{{ pp.deletedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ path('admin_trash_restore_person', {id: pp.id}) }}" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('restore-person-' ~ pp.id) }}">
+                                    <button class="btn btn-sm btn-outline-success"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                </form>
+                                <form method="post" action="{{ path('admin_trash_purge_person', {id: pp.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('УДАЛИТЬ ОКОНЧАТЕЛЬНО? Все теги и связи будут потеряны.');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('purge-person-' ~ pp.id) }}">
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-center text-muted py-5">Корзина пуста</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ============ Ссылки ============ #}
+    <div class="tab-pane fade" id="links-trash">
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>Название</th><th>URL</th><th>Категория</th><th>Кто удалил</th><th>Когда</th><th class="text-end"></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for ll in links %}
+                        <tr>
+                            <td><div class="fw-semibold">{{ ll.title }}</div></td>
+                            <td class="small text-muted text-break" style="max-width: 280px;">{{ ll.hostname }}</td>
+                            <td><i class="bi {{ ll.category.icon }}"></i> {{ ll.category.label }}</td>
+                            <td>{{ ll.deletedBy ? ll.deletedBy.displayName : '—' }}</td>
+                            <td class="small text-muted">{{ ll.deletedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ path('admin_trash_restore_link', {id: ll.id}) }}" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('restore-link-' ~ ll.id) }}">
+                                    <button class="btn btn-sm btn-outline-success"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                </form>
+                                <form method="post" action="{{ path('admin_trash_purge_link', {id: ll.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('УДАЛИТЬ ОКОНЧАТЕЛЬНО?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('purge-link-' ~ ll.id) }}">
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="text-center text-muted py-5">Корзина пуста</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

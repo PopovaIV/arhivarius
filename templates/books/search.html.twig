@@ -1,0 +1,72 @@
+{% extends 'base.html.twig' %}
+{% block title %}Поиск по библиотеке — {{ q }}{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .snippet mark { background-color: #fff3cd; color: inherit; padding: 0 2px; border-radius: 2px; font-weight: 600; }
+    .snippet { font-size: 0.95rem; line-height: 1.6; color: #495057; }
+</style>
+{% endblock %}
+
+{% block body %}
+<a href="{{ path('books_index') }}" class="text-muted text-decoration-none small">
+    <i class="bi bi-arrow-left"></i> Библиотека
+</a>
+<h2 class="mt-1 mb-3"><i class="bi bi-search"></i> Поиск по содержимому книг</h2>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-10">
+                <input type="search" name="q" value="{{ q }}" class="form-control"
+                       placeholder="Поиск по тексту внутри книг..." autofocus>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100"><i class="bi bi-search"></i> Искать</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if q %}
+    <p class="text-muted">Найдено: {{ results|length }}{% if results|length >= 30 %}+{% endif %} {{ results|length == 1 ? 'книга' : 'книг' }}</p>
+
+    {% for r in results %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex">
+                    <div class="me-3" style="flex-shrink: 0;">
+                        {% if r.book.hasCover %}
+                            <img src="{{ path('books_cover', {id: r.book.id}) }}" alt=""
+                                 style="width: 60px; height: 80px; object-fit: cover;" class="rounded">
+                        {% else %}
+                            <div class="d-flex align-items-center justify-content-center bg-light rounded"
+                                 style="width: 60px; height: 80px;">
+                                <i class="bi bi-book fs-3 text-secondary"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <a href="{{ path('books_show', {id: r.book.id}) }}" class="text-decoration-none">
+                            <h5 class="mb-1">{{ r.book.title }}</h5>
+                        </a>
+                        {% if r.book.authors %}
+                            <div class="text-muted small mb-2">{{ r.book.authors }}{% if r.book.year %} · {{ r.book.year }}{% endif %}</div>
+                        {% endif %}
+                        <div class="snippet">{{ r.snippet|raw }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="text-center text-muted py-5">
+            Ничего не найдено. Возможно, текст этой книги ещё не проиндексирован, или используйте другие ключевые слова.
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="alert alert-light border">
+        <p class="mb-1"><strong>Поиск ищет по тексту внутри книг.</strong></p>
+        <p class="mb-0 small text-muted">Для PDF/EPUB/FB2/TXT текст извлекается при загрузке. Для книг, загруженных до Фазы 4.5, потребуется переиндексация через консольную команду.</p>
+    </div>
+{% endif %}
+{% endblock %}

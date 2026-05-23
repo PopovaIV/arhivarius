@@ -1,0 +1,247 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ book.title }} — Чтение{% endblock %}
+
+{% block stylesheets %}
+<style>
+    body { padding-top: 0 !important; }
+    #reader-shell { display: flex; flex-direction: column; height: 100vh; }
+    #reader-bar {
+        display: flex; gap: 0.5rem; align-items: center;
+        padding: 0.5rem 1rem; background: #212529; color: #fff;
+        flex-shrink: 0; flex-wrap: wrap;
+    }
+    #reader-bar a, #reader-bar .btn { color: #fff; }
+    #reader-title { flex-grow: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    #reader-body { flex-grow: 1; display: flex; overflow: hidden; }
+    #epub-viewport { flex-grow: 1; overflow: hidden; background: #f8f9fa; }
+    #epub-area { width: 100%; height: 100%; }
+    #progress-indicator { font-size: 0.85rem; opacity: 0.8; }
+
+    #sidebar { width: 320px; background: #fff; border-left: 1px solid #dee2e6; overflow-y: auto; display: none; flex-shrink: 0; }
+    #sidebar.open { display: block; }
+    .annotation-item { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e9ecef; cursor: pointer; }
+    .annotation-item:hover { background: #f8f9fa; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div id="reader-shell">
+    <div id="reader-bar">
+        <a href="{{ path('books_show', {id: book.id}) }}" class="btn btn-sm btn-outline-light">
+            <i class="bi bi-x-lg"></i>
+        </a>
+        <div id="reader-title">{{ book.title }}{% if book.authors %} — <span class="text-muted">{{ book.authors }}</span>{% endif %}</div>
+        <button id="prev-btn" class="btn btn-sm btn-outline-light"><i class="bi bi-chevron-left"></i></button>
+        <button id="next-btn" class="btn btn-sm btn-outline-light"><i class="bi bi-chevron-right"></i></button>
+        <div class="vr"></div>
+        <span id="progress-indicator">прогресс: <span id="progress-percent">0</span>%</span>
+        <button id="add-bookmark" class="btn btn-sm btn-outline-light" title="Добавить закладку">
+            <i class="bi bi-bookmark-plus"></i>
+        </button>
+        <button id="add-note" class="btn btn-sm btn-outline-light" title="Добавить заметку">
+            <i class="bi bi-sticky"></i>
+        </button>
+        <button id="toggle-sidebar" class="btn btn-sm btn-outline-light" title="Закладки и заметки">
+            <i class="bi bi-list-ul"></i>
+        </button>
+        <a href="{{ path('books_file_download', {bookId: book.id, fileId: file.id}) }}"
+           class="btn btn-sm btn-outline-light" title="Скачать">
+            <i class="bi bi-download"></i>
+        </a>
+    </div>
+    <div id="reader-body">
+        <div id="epub-viewport"><div id="epub-area"></div></div>
+        <div id="sidebar">
+            <div class="p-3 border-bottom bg-light">
+                <strong><i class="bi bi-bookmarks"></i> Закладки и заметки</strong>
+            </div>
+            <div id="annotations-list"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+<script>
+const STREAM_URL = {{ stream_url|json_encode|raw }};
+const PROGRESS_URL = {{ path('books_progress', {id: book.id})|json_encode|raw }};
+const ANN_URL = {{ path('book_annotations_list', {bookId: book.id})|json_encode|raw }};
+const INITIAL_CFI = {{ progress and progress.epubCfi ? progress.epubCfi|json_encode|raw : 'null' }};
+
+const sidebar = document.getElementById('sidebar');
+const annList = document.getElementById('annotations-list');
+
+const book = ePub(STREAM_URL, { openAs: 'epub' });
+const rendition = book.renderTo('epub-area', {
+    width: '100%', height: '100%',
+    flow: 'paginated', spread: 'auto',
+});
+
+let lastHeartbeat = Date.now();
+let currentLocation = null;
+let lastSentCfi = null;
+let totalLocations = 0;
+
+book.ready.then(async () => {
+    await book.locations.generate(1024);
+    totalLocations = book.locations.length();
+    if (INITIAL_CFI) {
+        await rendition.display(INITIAL_CFI);
+    } else {
+        await rendition.display();
+    }
+    loadAnnotations();
+}).catch(err => {
+    console.error('EPUB load error:', err);
+    document.getElementById('epub-area').innerHTML =
+        '<div class="alert alert-danger m-3">Не удалось открыть EPUB: ' + err.message + '</div>';
+});
+
+rendition.on('relocated', (location) => {
+    currentLocation = location;
+    if (totalLocations && location.start && location.start.cfi) {
+        const percent = Math.round(book.locations.percentageFromCfi(location.start.cfi) * 100);
+        document.getElementById('progress-percent').textContent = percent;
+    }
+});
+
+document.getElementById('prev-btn').addEventListener('click', () => rendition.prev());
+document.getElementById('next-btn').addEventListener('click', () => rendition.next());
+document.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowLeft') rendition.prev();
+    if (e.key === 'ArrowRight') rendition.next();
+});
+
+setInterval(() => {
+    if (document.hidden || !currentLocation || !currentLocation.start) return;
+    const cfi = currentLocation.start.cfi;
+    const now = Date.now();
+    const delta = Math.round((now - lastHeartbeat) / 1000);
+    lastHeartbeat = now;
+    if (cfi !== lastSentCfi || delta >= 15) {
+        const percent = totalLocations ? Math.round(book.locations.percentageFromCfi(cfi) * 100) : 0;
+        sendProgress({ epub_cfi: cfi, percent: percent, delta_seconds: delta });
+        lastSentCfi = cfi;
+    }
+}, 20000);
+
+async function sendProgress(data) {
+    try {
+        await fetch(PROGRESS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            credentials: 'same-origin',
+        });
+    } catch (e) {}
+}
+
+window.addEventListener('beforeunload', () => {
+    if (!currentLocation || !currentLocation.start) return;
+    const cfi = currentLocation.start.cfi;
+    const delta = Math.round((Date.now() - lastHeartbeat) / 1000);
+    const percent = totalLocations ? Math.round(book.locations.percentageFromCfi(cfi) * 100) : 0;
+    navigator.sendBeacon(PROGRESS_URL, new Blob([JSON.stringify({
+        epub_cfi: cfi, percent, delta_seconds: delta,
+    })], { type: 'application/json' }));
+});
+
+// === Закладки и заметки ===
+document.getElementById('toggle-sidebar').addEventListener('click', () => sidebar.classList.toggle('open'));
+
+document.getElementById('add-bookmark').addEventListener('click', async () => {
+    if (!currentLocation || !currentLocation.start) return;
+    const label = prompt('Подпись закладки (по желанию):', 'Закладка');
+    if (label === null) return;
+    await createAnnotation('bookmark', label || 'Закладка');
+});
+
+document.getElementById('add-note').addEventListener('click', async () => {
+    if (!currentLocation || !currentLocation.start) return;
+    const text = prompt('Текст заметки:');
+    if (text === null || text.trim() === '') return;
+    await createAnnotation('note', text);
+});
+
+async function loadAnnotations() {
+    try {
+        const res = await fetch(ANN_URL, { credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = await res.json();
+        renderAnnotations(data.items || []);
+    } catch (e) {}
+}
+
+function renderAnnotations(items) {
+    if (items.length === 0) {
+        annList.innerHTML = '<div class="p-3 text-muted small">Закладок и заметок ещё нет.</div>';
+        return;
+    }
+    annList.innerHTML = items.map(a => `
+        <div class="annotation-item" data-cfi="${escapeAttr(a.epub_cfi ?? '')}" data-id="${a.id}">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1 me-2">
+                    <span class="badge bg-${a.type === 'bookmark' ? 'primary' : 'warning'}">
+                        <i class="bi ${a.type === 'bookmark' ? 'bi-bookmark' : 'bi-sticky'}"></i>
+                        ${a.type === 'bookmark' ? 'закладка' : 'заметка'}
+                    </span>
+                    <div class="mt-1 small">${escapeHtml(a.content)}</div>
+                </div>
+                <button class="btn btn-sm btn-link text-danger p-0 ann-delete" data-id="${a.id}">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    annList.querySelectorAll('.annotation-item').forEach(el => {
+        el.addEventListener('click', (e) => {
+            if (e.target.closest('.ann-delete')) return;
+            const cfi = el.dataset.cfi;
+            if (cfi) rendition.display(cfi);
+        });
+    });
+    annList.querySelectorAll('.ann-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm('Удалить?')) return;
+            await deleteAnnotation(btn.dataset.id);
+        });
+    });
+}
+
+async function createAnnotation(type, content) {
+    const cfi = currentLocation?.start?.cfi;
+    if (!cfi) return;
+    try {
+        const res = await fetch(ANN_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ type, content, epub_cfi: cfi }),
+        });
+        if (res.ok) {
+            sidebar.classList.add('open');
+            await loadAnnotations();
+        }
+    } catch (e) {}
+}
+
+async function deleteAnnotation(id) {
+    try {
+        const res = await fetch(ANN_URL + '/' + id, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+        });
+        if (res.ok) await loadAnnotations();
+    } catch (e) {}
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+}
+function escapeAttr(s) { return escapeHtml(s); }
+</script>
+{% endblock %}

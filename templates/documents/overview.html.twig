@@ -1,0 +1,24 @@
+{% extends 'base.html.twig' %}
+{% block title %}Документы — {{ app_name }}{% endblock %}
+
+{% block body %}
+<h2 class="mb-4"><i class="bi bi-folder"></i> Архивные документы</h2>
+
+<div class="row g-3">
+    {% for s in stats %}
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ path('documents_index', {slug: s.category.slug}) }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <i class="bi {{ s.category.icon }} fs-1 text-primary"></i>
+                        <span class="badge bg-secondary">{{ s.count }}</span>
+                    </div>
+                    <h5 class="card-title mt-3 text-dark">{{ s.category.label }}</h5>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

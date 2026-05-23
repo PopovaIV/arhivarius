@@ -1,0 +1,118 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ category.label }} — {{ app_name }}{% endblock %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <a href="{{ path('documents_overview') }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> Все категории
+        </a>
+        <h2 class="mt-1"><i class="bi {{ category.icon }}"></i> {{ category.label }}</h2>
+        <p class="text-muted mb-0">Всего записей: {{ total }}</p>
+    </div>
+    {% if is_granted('ROLE_CONTRIBUTOR') %}
+    <a href="{{ path('documents_new', {slug: category.slug}) }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Добавить
+    </a>
+    {% endif %}
+</div>
+
+{% set extra_label = {
+    'metric_book': 'Тип',
+    'revision_tale': 'Глава семьи',
+    'confession_list': 'Глава семьи',
+    'emigration': 'Эмигрант',
+    'ship_log': 'Судно',
+    'press': 'Издание',
+}[category.value] ?? null %}
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Название</th>
+                    {% if extra_label %}<th>{{ extra_label }}</th>{% endif %}
+                    <th>Дата</th>
+                    <th>Место</th>
+                    <th>Файлов</th>
+                    <th>Добавил</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for d in items %}
+                <tr>
+                    <td>
+                        <a href="{{ path('documents_show', {id: d.id}) }}" class="text-decoration-none fw-semibold">
+                            {{ d.title }}
+                        </a>
+                        {% if d.archiveReference %}
+                            <div class="small text-muted">{{ d.archiveReference }}</div>
+                        {% endif %}
+                    </td>
+                    {% if extra_label %}
+                    <td class="small">
+                        {% set md = d.metadata ?? {} %}
+                        {% if category.value == 'metric_book' %}
+                            {% set rt = md.record_type ?? null %}
+                            {% set rt_label = {'birth':'Рождение','marriage':'Брак','death':'Смерть'}[rt] ?? '—' %}
+                            <span class="badge bg-light text-dark">{{ rt_label }}</span>
+                        {% elseif category.value == 'revision_tale' %}
+                            {{ md.household_head ?? '—' }}
+                        {% elseif category.value == 'confession_list' %}
+                            {{ md.household_head ?? '—' }}
+                        {% elseif category.value == 'emigration' %}
+                            {{ md.person_name ?? '—' }}
+                        {% elseif category.value == 'ship_log' %}
+                            {{ md.ship_name ?? '—' }}
+                        {% elseif category.value == 'press' %}
+                            {{ md.publication_name ?? '—' }}
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    <td class="text-nowrap small">{{ d.documentDate ?? (d.documentYear ?? '—') }}</td>
+                    <td class="small">{{ d.place ?? '—' }}</td>
+                    <td class="text-center">
+                        {% if d.files|length > 0 %}
+                            <span class="badge bg-light text-dark">
+                                <i class="bi bi-paperclip"></i> {{ d.files|length }}
+                            </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="small text-muted">
+                        {{ d.createdBy.displayName }}<br>
+                        <span>{{ d.createdAt|date('d.m.Y') }}</span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ path('documents_show', {id: d.id}) }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="text-center text-muted py-5">
+                    В этой категории документов пока нет.
+                    {% if is_granted('ROLE_CONTRIBUTOR') %}
+                        <a href="{{ path('documents_new', {slug: category.slug}) }}">Добавить первый</a>?
+                    {% endif %}
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% set pages = (total / per_page)|round(0, 'ceil') %}
+{% if pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination">
+        {% for p in 1..pages %}
+            <li class="page-item {{ p == page ? 'active' }}">
+                <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

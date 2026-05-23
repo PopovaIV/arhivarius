@@ -1,0 +1,133 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ book.title }} — Библиотека{% endblock %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <a href="{{ path('books_index') }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> Библиотека
+        </a>
+        <h2 class="mt-1"><i class="bi bi-book"></i> {{ book.title }}</h2>
+        {% if book.authors %}<div class="text-muted">{{ book.authors }}</div>{% endif %}
+    </div>
+    <div class="btn-group">
+        {% if is_granted('book_edit', book) %}
+            <a href="{{ path('books_edit', {id: book.id}) }}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Изменить
+            </a>
+        {% endif %}
+        {% if is_granted('book_delete', book) %}
+            <form method="post" action="{{ path('books_delete', {id: book.id}) }}"
+                  onsubmit="return confirm('Переместить книгу в корзину?');">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete-book-' ~ book.id) }}">
+                <button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Удалить</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4">
+        {% if book.hasCover %}
+        <div class="card shadow-sm mb-3">
+            <img src="{{ path('books_cover', {id: book.id}) }}" alt="Обложка"
+                 class="card-img-top" style="object-fit: contain; max-height: 400px; background: #f8f9fa;">
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-3">Сведения</h6>
+                <dl class="row mb-0">
+                    {% if book.year %}<dt class="col-5">Год</dt><dd class="col-7">{{ book.year }}</dd>{% endif %}
+                    {% if book.publisher %}<dt class="col-5">Издатель</dt><dd class="col-7">{{ book.publisher }}</dd>{% endif %}
+                    {% if book.language %}<dt class="col-5">Язык</dt><dd class="col-7">{{ book.language|upper }}</dd>{% endif %}
+                    {% if book.genre %}<dt class="col-5">Жанр</dt><dd class="col-7">{{ book.genre }}</dd>{% endif %}
+                    {% if book.isbn %}<dt class="col-5">ISBN</dt><dd class="col-7"><code class="small">{{ book.isbn }}</code></dd>{% endif %}
+                    <dt class="col-5">Добавил</dt>
+                    <dd class="col-7">{{ book.createdBy.displayName }}<div class="small text-muted">{{ book.createdAt|date('d.m.Y') }}</div></dd>
+                </dl>
+            </div>
+        </div>
+
+        {% if progress %}
+        <div class="card shadow-sm mb-3 border-success">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Ваш прогресс</h6>
+                {% if progress.percent %}
+                    <div class="progress mb-2" style="height: 8px;">
+                        <div class="progress-bar bg-success" style="width: {{ progress.percent }}%;"></div>
+                    </div>
+                    <div class="small">Прочитано {{ progress.percent }}%</div>
+                {% endif %}
+                {% if progress.pdfPage %}
+                    <div class="small text-muted">Страница: {{ progress.pdfPage }}{% if progress.pdfTotalPages %} из {{ progress.pdfTotalPages }}{% endif %}</div>
+                {% endif %}
+                {% if progress.totalSeconds > 0 %}
+                    <div class="small text-muted">Время чтения: {{ (progress.totalSeconds / 60)|round }} мин.</div>
+                {% endif %}
+                <div class="small text-muted">Последний раз: {{ progress.lastReadAt|date('d.m.Y H:i') }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if book.description %}
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Описание</h6>
+                <div style="white-space: pre-wrap;">{{ book.description }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-8">
+        {% set readable = book.findReadableFile %}
+        {% if readable %}
+            <a href="{{ path('books_read', {id: book.id, file: readable.id}) }}" class="btn btn-primary btn-lg w-100 mb-3">
+                <i class="bi bi-book-half"></i> Читать в браузере ({{ readable.format.label }})
+            </a>
+        {% endif %}
+
+        <h5 class="mb-3">Файлы ({{ book.files|length }})</h5>
+        <div class="list-group shadow-sm">
+            {% for f in book.files %}
+            <div class="list-group-item">
+                <div class="d-flex align-items-center">
+                    <i class="bi {{ f.format.icon }} fs-3 me-3 text-primary"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold text-break">{{ f.originalName }}</div>
+                        <div class="small text-muted">
+                            {{ f.format.label }} · {{ (f.sizeBytes / 1024 / 1024)|number_format(2) }} МБ
+                        </div>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        {% if f.format.isReadable %}
+                            <a href="{{ path('books_read', {id: book.id, file: f.id}) }}"
+                               class="btn btn-outline-primary" title="Читать">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        {% endif %}
+                        <a href="{{ path('books_file_download', {bookId: book.id, fileId: f.id}) }}"
+                           class="btn btn-outline-secondary" title="Скачать">
+                            <i class="bi bi-download"></i>
+                        </a>
+                        {% if is_granted('book_edit', book) %}
+                        <form method="post" action="{{ path('books_file_delete', {bookId: book.id, fileId: f.id}) }}"
+                              onsubmit="return confirm('Удалить файл «{{ f.originalName|e('js') }}»?');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete-bf-' ~ f.id) }}">
+                            <button class="btn btn-outline-danger" title="Удалить файл">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+                <div class="list-group-item text-center text-muted py-5">К книге не прикреплено файлов</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

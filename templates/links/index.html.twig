@@ -1,0 +1,105 @@
+{% extends 'base.html.twig' %}
+{% block title %}Ссылки — {{ app_name }}{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .link-card { padding: 0.75rem 1rem; border: 1px solid #e9ecef; border-radius: 0.4rem; margin-bottom: 0.5rem; transition: background 0.15s; }
+    .link-card:hover { background: #f8f9fa; }
+    .link-host { color: #6c757d; font-size: 0.8rem; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-link-45deg"></i> Полезные ссылки</h2>
+    {% if is_granted('ROLE_CONTRIBUTOR') %}
+    <a href="{{ path('links_new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Добавить ссылку
+    </a>
+    {% endif %}
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-10">
+                <label class="form-label small">Поиск по названию, описанию или тегам</label>
+                <input type="search" name="q" value="{{ q ?? '' }}" class="form-control form-control-sm" autofocus>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary btn-sm w-100">Найти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% set is_admin = is_granted('ROLE_ADMIN') %}
+{% set current_user_id = app.user.id %}
+
+{% set total = 0 %}
+{% for cat_value, links in groups %}
+    {% set total = total + links|length %}
+    {% if links|length > 0 %}
+        {% set cat = links[0].category %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-light">
+                <i class="bi {{ cat.icon }}"></i> <strong>{{ cat.label }}</strong>
+                <span class="badge bg-secondary ms-1">{{ links|length }}</span>
+            </div>
+            <div class="card-body">
+                {% for l in links %}
+                    <div class="link-card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <a href="{{ l.url }}" target="_blank" rel="noopener" class="text-decoration-none fw-semibold">
+                                    {{ l.title }} <i class="bi bi-box-arrow-up-right small"></i>
+                                </a>
+                                <div class="link-host">{{ l.hostname }}</div>
+                                {% if l.description %}
+                                    <div class="small text-muted mt-1">{{ l.description }}</div>
+                                {% endif %}
+                                {% if l.tags %}
+                                    <div class="mt-1">
+                                        {% for tag in l.tags|split(',') %}
+                                            {% if tag|trim != '' %}
+                                                <span class="badge bg-light text-dark border">{{ tag|trim }}</span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="ms-2 text-end small text-muted" style="flex-shrink: 0;">
+                                {{ l.createdBy.displayName }}
+                                {% set can_manage = is_admin or l.createdBy.id == current_user_id %}
+                                {% if can_manage %}
+                                <div class="d-flex gap-1 mt-1">
+                                    <a href="{{ path('links_edit', {id: l.id}) }}" class="btn btn-sm btn-outline-secondary py-0 px-1">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="post" action="{{ path('links_delete', {id: l.id}) }}" class="d-inline"
+                                          onsubmit="return confirm('Удалить ссылку?');">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete-link-' ~ l.id) }}">
+                                        <button class="btn btn-sm btn-outline-danger py-0 px-1">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+{% endfor %}
+
+{% if total == 0 %}
+    <div class="alert alert-light border text-center">
+        Ссылок пока нет.
+        {% if is_granted('ROLE_CONTRIBUTOR') %}
+            <a href="{{ path('links_new') }}">Добавить первую</a>?
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'base.html.twig' %}
+{% block title %}Изменить: {{ photo.title }}{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <a href="{{ path('photos_show', {id: photo.id}) }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> К фотографии
+        </a>
+        <h2 class="mt-1 mb-4"><i class="bi bi-pencil"></i> Изменить фото</h2>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                {{ form_start(form) }}
+                {{ form_row(form.title) }}
+                {{ form_row(form.description) }}
+                <div class="row">
+                    <div class="col-md-6">{{ form_row(form.takenDate) }}</div>
+                    <div class="col-md-6">{{ form_row(form.takenYear) }}</div>
+                </div>
+                {{ form_row(form.place) }}
+
+                <div class="d-flex justify-content-between">
+                    <a href="{{ path('photos_show', {id: photo.id}) }}" class="btn btn-outline-secondary">Отмена</a>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends 'base.html.twig' %}
+{% block title %}Вход — {{ app_name }}{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm mt-5">
+            <div class="card-body p-4">
+                <h4 class="card-title text-center mb-4">
+                    <i class="bi bi-archive-fill"></i> {{ app_name }}
+                </h4>
+
+                {% if error %}
+                    <div class="alert alert-danger">
+                        {{ error.messageKey|trans(error.messageData, 'security') }}
+                    </div>
+                {% endif %}
+
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Логин</label>
+                        <input type="text" id="username" name="_username" value="{{ last_username }}"
+                               class="form-control" autocomplete="username" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Пароль</label>
+                        <input type="password" id="password" name="_password"
+                               class="form-control" autocomplete="current-password" required>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="remember_me" name="_remember_me">
+                        <label class="form-check-label" for="remember_me">Запомнить меня</label>
+                    </div>
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                    <button type="submit" class="btn btn-primary w-100">Войти</button>
+                </form>
+            </div>
+        </div>
+        <p class="text-muted text-center mt-3 small">
+            Доступ к архиву только по приглашению администратора
+        </p>
+    </div>
+</div>
+{% endblock %}

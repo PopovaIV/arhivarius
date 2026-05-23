@@ -1,0 +1,52 @@
+{% import 'documents/_metadata/_macros.html.twig' as m %}
+
+{% set record_type = md.record_type ?? null %}
+
+{% set title = {
+    birth: 'Запись о рождении',
+    marriage: 'Запись о бракосочетании',
+    death: 'Запись о смерти / погребении',
+}[record_type] ?? 'Метрическая запись' %}
+
+{% set icon = {
+    birth: 'bi-stars',
+    marriage: 'bi-suit-heart',
+    death: 'bi-flower2',
+}[record_type] ?? 'bi-journal-text' %}
+
+{{ m.card_start(title, icon) }}
+    {% if record_type == 'birth' %}
+        {{ m.field('Имя ребёнка', md.child_name ?? null) }}
+        {% if md.child_sex is defined %}
+            {{ m.field('Пол', {'male': 'мужской', 'female': 'женский'}[md.child_sex] ?? md.child_sex) }}
+        {% endif %}
+        {{ m.field('Дата рождения', md.birth_date_text ?? null) }}
+        {{ m.field('Дата крещения', md.baptism_date ?? null) }}
+        {{ m.field('Отец', md.father ?? null) }}
+        {{ m.field('Мать', md.mother ?? null) }}
+        {% if md.legitimate is defined %}
+            {{ m.field('Законнорождённый', md.legitimate == 'yes' ? 'да' : 'нет') }}
+        {% endif %}
+        {{ m.list('Восприемники', md.godparents ?? []) }}
+
+    {% elseif record_type == 'marriage' %}
+        {{ m.field('Жених', md.groom ?? null) }}
+        {{ m.field('Возраст жениха', md.groom_age ?? null) }}
+        {{ m.field('Статус жениха', md.groom_status ?? null) }}
+        {{ m.field('Невеста', md.bride ?? null) }}
+        {{ m.field('Возраст невесты', md.bride_age ?? null) }}
+        {{ m.field('Статус невесты', md.bride_status ?? null) }}
+        {{ m.field('Дата венчания', md.wedding_date ?? null) }}
+        {{ m.list('Поручители', md.witnesses ?? []) }}
+
+    {% elseif record_type == 'death' %}
+        {{ m.field('Умерший', md.deceased ?? null) }}
+        {{ m.field('Возраст', md.deceased_age ?? null) }}
+        {{ m.field('Дата смерти', md.death_date_text ?? null) }}
+        {{ m.field('Причина смерти', md.death_cause ?? null) }}
+        {{ m.field('Дата погребения', md.burial_date ?? null) }}
+        {{ m.field('Место погребения', md.burial_place ?? null) }}
+    {% endif %}
+
+    {{ m.field('Священник', md.priest ?? null) }}
+{{ m.card_end() }}

@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+{% block title %}Новый документ — {{ category.label }}{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <a href="{{ path('documents_index', {slug: category.slug}) }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> {{ category.label }}
+        </a>
+        <h2 class="mt-1 mb-4">
+            <i class="bi bi-plus-circle"></i> Новый: {{ category.singular }}
+        </h2>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                {{ form_start(form, {attr: {enctype: 'multipart/form-data', 'data-controller': category.value == 'metric_book' ? 'metric-record' : ''}}) }}
+
+                <h5 class="text-muted mb-3"><i class="bi bi-tag"></i> Базовые сведения</h5>
+                {{ form_row(form.title) }}
+                {{ form_row(form.description) }}
+                <div class="row">
+                    <div class="col-md-6">{{ form_row(form.documentDate) }}</div>
+                    <div class="col-md-3">{{ form_row(form.documentYear) }}</div>
+                    <div class="col-md-3">{{ form_row(form.datePrecision) }}</div>
+                </div>
+                {{ form_row(form.place) }}
+                {{ form_row(form.archiveReference) }}
+
+                {% if form.metadata is defined %}
+                <hr>
+                <h5 class="text-muted mb-3"><i class="bi {{ category.icon }}"></i> Сведения категории</h5>
+                {{ form_widget(form.metadata) }}
+                {% endif %}
+
+                <hr>
+                <h5 class="text-muted mb-3"><i class="bi bi-paperclip"></i> Файлы</h5>
+                {{ form_row(form.uploadFiles) }}
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ path('documents_index', {slug: category.slug}) }}" class="btn btn-outline-secondary">Отмена</a>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if category.value == 'metric_book' %}
+    {% include 'documents/_metric_switch_script.html.twig' %}
+{% endif %}
+{% endblock %}

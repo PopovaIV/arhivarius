@@ -1,0 +1,21 @@
+/vendor/
+/var/
+/node_modules/
+/.env.local
+/.env.local.php
+/.env.*.local
+/public/build/
+/public/bundles/
+.idea/
+.vscode/
+*.log
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###

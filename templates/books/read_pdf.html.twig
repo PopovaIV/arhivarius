@@ -1,0 +1,343 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ book.title }} — Чтение{% endblock %}
+
+{% block stylesheets %}
+<style>
+    body { padding-top: 0 !important; }
+    #reader-shell { display: flex; flex-direction: column; height: 100vh; }
+    #reader-bar {
+        display: flex; gap: 0.5rem; align-items: center;
+        padding: 0.5rem 1rem; background: #212529; color: #fff;
+        flex-shrink: 0; flex-wrap: wrap;
+    }
+    #reader-bar a, #reader-bar .btn { color: #fff; }
+    #reader-bar input { width: 5rem; }
+    #reader-title { flex-grow: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #reader-body { flex-grow: 1; display: flex; overflow: hidden; }
+    #pdf-viewport { flex-grow: 1; overflow: auto; background: #2a2a2a; padding: 1rem; }
+    #pdf-pages { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+    .pdf-page {
+        background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        min-height: 800px; min-width: 600px;
+        display: flex; align-items: center; justify-content: center;
+        color: #888;
+    }
+    .pdf-page canvas { display: block; }
+    #progress-indicator { font-size: 0.85rem; opacity: 0.8; }
+
+    #sidebar { width: 320px; background: #f8f9fa; border-left: 1px solid #dee2e6; overflow-y: auto; display: none; flex-shrink: 0; }
+    #sidebar.open { display: block; }
+    .annotation-item { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e9ecef; cursor: pointer; }
+    .annotation-item:hover { background: #fff; }
+    .annotation-item .badge-page { font-size: 0.75rem; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div id="reader-shell">
+    <div id="reader-bar">
+        <a href="{{ path('books_show', {id: book.id}) }}" class="btn btn-sm btn-outline-light">
+            <i class="bi bi-x-lg"></i>
+        </a>
+        <div id="reader-title">{{ book.title }}{% if book.authors %} — <span class="text-muted">{{ book.authors }}</span>{% endif %}</div>
+        <button id="zoom-out" class="btn btn-sm btn-outline-light"><i class="bi bi-zoom-out"></i></button>
+        <button id="zoom-in" class="btn btn-sm btn-outline-light"><i class="bi bi-zoom-in"></i></button>
+        <div class="vr"></div>
+        <input id="page-input" type="number" min="1" class="form-control form-control-sm" value="1">
+        <span>/ <span id="page-total">…</span></span>
+        <div class="vr"></div>
+        <span id="progress-indicator">прогресс: <span id="progress-percent">0</span>%</span>
+        <button id="add-bookmark" class="btn btn-sm btn-outline-light" title="Добавить закладку">
+            <i class="bi bi-bookmark-plus"></i>
+        </button>
+        <button id="add-note" class="btn btn-sm btn-outline-light" title="Добавить заметку">
+            <i class="bi bi-sticky"></i>
+        </button>
+        <button id="toggle-sidebar" class="btn btn-sm btn-outline-light" title="Закладки и заметки">
+            <i class="bi bi-list-ul"></i>
+        </button>
+        <a href="{{ path('books_file_download', {bookId: book.id, fileId: file.id}) }}"
+           class="btn btn-sm btn-outline-light" title="Скачать">
+            <i class="bi bi-download"></i>
+        </a>
+    </div>
+    <div id="reader-body">
+        <div id="pdf-viewport">
+            <div id="pdf-pages"></div>
+        </div>
+        <div id="sidebar">
+            <div class="p-3 border-bottom bg-white">
+                <strong><i class="bi bi-bookmarks"></i> Закладки и заметки</strong>
+                <div class="small text-muted">Только для вас</div>
+            </div>
+            <div id="annotations-list"></div>
+        </div>
+    </div>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "pdfjs-dist": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs"
+    }
+}
+</script>
+<script type="module">
+import * as pdfjs from 'pdfjs-dist';
+
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.mjs';
+
+const STREAM_URL = {{ stream_url|json_encode|raw }};
+const PROGRESS_URL = {{ path('books_progress', {id: book.id})|json_encode|raw }};
+const ANN_URL = {{ path('book_annotations_list', {bookId: book.id})|json_encode|raw }};
+const INITIAL_PAGE = {{ progress and progress.pdfPage ? progress.pdfPage : 1 }};
+
+const pagesContainer = document.getElementById('pdf-pages');
+const pageInput = document.getElementById('page-input');
+const pageTotal = document.getElementById('page-total');
+const progressPercent = document.getElementById('progress-percent');
+const zoomInBtn = document.getElementById('zoom-in');
+const zoomOutBtn = document.getElementById('zoom-out');
+const viewport = document.getElementById('pdf-viewport');
+const sidebar = document.getElementById('sidebar');
+const annList = document.getElementById('annotations-list');
+
+let pdf = null;
+let totalPages = 0;
+let scale = 1.3;
+let renderedPages = new Map();
+let currentVisiblePage = INITIAL_PAGE;
+
+const loadingTask = pdfjs.getDocument({
+    url: STREAM_URL,
+    disableStream: false,
+    disableAutoFetch: true,
+    rangeChunkSize: 65536,
+    withCredentials: true,
+});
+
+loadingTask.promise.then(async (loadedPdf) => {
+    pdf = loadedPdf;
+    totalPages = pdf.numPages;
+    pageTotal.textContent = totalPages;
+    pageInput.max = totalPages;
+
+    for (let i = 1; i <= totalPages; i++) {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'pdf-page';
+        placeholder.dataset.pageNum = i;
+        placeholder.textContent = 'страница ' + i;
+        pagesContainer.appendChild(placeholder);
+    }
+
+    const renderObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+            const num = Number(entry.target.dataset.pageNum);
+            if (entry.isIntersecting) {
+                renderPage(num, entry.target);
+                currentVisiblePage = num;
+                pageInput.value = num;
+                updatePercent();
+            }
+        }
+    }, { rootMargin: '500px 0px', threshold: 0.1 });
+
+    document.querySelectorAll('.pdf-page').forEach(el => renderObserver.observe(el));
+
+    if (INITIAL_PAGE > 1 && INITIAL_PAGE <= totalPages) {
+        setTimeout(() => goToPage(INITIAL_PAGE), 200);
+    }
+
+    sendProgress({ pdf_total: totalPages });
+    loadAnnotations();
+}).catch(err => {
+    console.error('PDF load error:', err);
+    pagesContainer.innerHTML = '<div class="alert alert-danger">Не удалось загрузить PDF: ' + err.message + '</div>';
+});
+
+async function renderPage(num, container) {
+    if (renderedPages.has(num)) return;
+    renderedPages.set(num, true);
+    try {
+        const page = await pdf.getPage(num);
+        const vp = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.height = vp.height;
+        canvas.width = vp.width;
+        container.innerHTML = '';
+        container.style.minHeight = vp.height + 'px';
+        container.style.minWidth = vp.width + 'px';
+        container.appendChild(canvas);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    } catch (err) {
+        console.error('render error', num, err);
+        renderedPages.delete(num);
+    }
+}
+
+function goToPage(num) {
+    const el = document.querySelector('.pdf-page[data-page-num="' + num + '"]');
+    if (el) el.scrollIntoView({ block: 'start' });
+}
+
+function updatePercent() {
+    if (!totalPages) return;
+    progressPercent.textContent = Math.round((currentVisiblePage / totalPages) * 100);
+}
+
+pageInput.addEventListener('change', () => {
+    const n = Math.max(1, Math.min(totalPages, Number(pageInput.value)));
+    goToPage(n);
+});
+
+zoomInBtn.addEventListener('click', () => { scale = Math.min(3, scale + 0.2); rerenderAll(); });
+zoomOutBtn.addEventListener('click', () => { scale = Math.max(0.5, scale - 0.2); rerenderAll(); });
+
+function rerenderAll() {
+    renderedPages.clear();
+    document.querySelectorAll('.pdf-page').forEach(el => {
+        el.innerHTML = 'страница ' + el.dataset.pageNum;
+    });
+    const visible = document.querySelector('.pdf-page[data-page-num="' + currentVisiblePage + '"]');
+    if (visible) renderPage(currentVisiblePage, visible);
+}
+
+// === Прогресс ===
+let lastSentPage = INITIAL_PAGE;
+let lastHeartbeat = Date.now();
+
+setInterval(() => {
+    if (document.hidden) return;
+    const now = Date.now();
+    const delta = Math.round((now - lastHeartbeat) / 1000);
+    lastHeartbeat = now;
+    if (currentVisiblePage !== lastSentPage || delta >= 15) {
+        sendProgress({
+            pdf_page: currentVisiblePage,
+            pdf_total: totalPages,
+            percent: totalPages ? Math.round((currentVisiblePage / totalPages) * 100) : 0,
+            delta_seconds: delta,
+        });
+        lastSentPage = currentVisiblePage;
+    }
+}, 20000);
+
+async function sendProgress(data) {
+    try {
+        await fetch(PROGRESS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            credentials: 'same-origin',
+        });
+    } catch (e) { console.warn('progress send failed', e); }
+}
+
+window.addEventListener('beforeunload', () => {
+    const delta = Math.round((Date.now() - lastHeartbeat) / 1000);
+    const data = {
+        pdf_page: currentVisiblePage,
+        pdf_total: totalPages,
+        percent: totalPages ? Math.round((currentVisiblePage / totalPages) * 100) : 0,
+        delta_seconds: delta,
+    };
+    navigator.sendBeacon(PROGRESS_URL, new Blob([JSON.stringify(data)], { type: 'application/json' }));
+});
+
+// === Закладки и заметки ===
+document.getElementById('toggle-sidebar').addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+});
+
+document.getElementById('add-bookmark').addEventListener('click', async () => {
+    const label = prompt('Подпись закладки (по желанию):', 'Страница ' + currentVisiblePage);
+    if (label === null) return;
+    await createAnnotation('bookmark', label || ('Страница ' + currentVisiblePage));
+});
+
+document.getElementById('add-note').addEventListener('click', async () => {
+    const text = prompt('Текст заметки:');
+    if (text === null || text.trim() === '') return;
+    await createAnnotation('note', text);
+});
+
+async function loadAnnotations() {
+    try {
+        const res = await fetch(ANN_URL, { credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = await res.json();
+        renderAnnotations(data.items || []);
+    } catch (e) { console.warn(e); }
+}
+
+function renderAnnotations(items) {
+    if (items.length === 0) {
+        annList.innerHTML = '<div class="p-3 text-muted small">Здесь пока пусто. Используйте кнопки в верхней панели, чтобы добавить закладку или заметку.</div>';
+        return;
+    }
+    annList.innerHTML = items.map(a => `
+        <div class="annotation-item" data-page="${a.pdf_page}" data-id="${a.id}">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1 me-2">
+                    <span class="badge bg-${a.type === 'bookmark' ? 'primary' : 'warning'} badge-page">
+                        <i class="bi ${a.type === 'bookmark' ? 'bi-bookmark' : 'bi-sticky'}"></i>
+                        стр. ${a.pdf_page ?? '—'}
+                    </span>
+                    <div class="mt-1 small">${escapeHtml(a.content)}</div>
+                </div>
+                <button class="btn btn-sm btn-link text-danger p-0 ann-delete" data-id="${a.id}">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    annList.querySelectorAll('.annotation-item').forEach(el => {
+        el.addEventListener('click', (e) => {
+            if (e.target.closest('.ann-delete')) return;
+            const page = Number(el.dataset.page);
+            if (page) goToPage(page);
+        });
+    });
+    annList.querySelectorAll('.ann-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm('Удалить эту запись?')) return;
+            await deleteAnnotation(btn.dataset.id);
+        });
+    });
+}
+
+async function createAnnotation(type, content) {
+    try {
+        const res = await fetch(ANN_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ type, content, pdf_page: currentVisiblePage }),
+        });
+        if (res.ok) {
+            sidebar.classList.add('open');
+            await loadAnnotations();
+        }
+    } catch (e) { console.warn(e); }
+}
+
+async function deleteAnnotation(id) {
+    try {
+        const res = await fetch(ANN_URL + '/' + id, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+        });
+        if (res.ok) await loadAnnotations();
+    } catch (e) { console.warn(e); }
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% import 'documents/_metadata/_macros.html.twig' as m %}
+
+{{ m.card_start('Исповедная роспись', 'bi-book-half') }}
+    {{ m.field('Приход', md.parish_name ?? null) }}
+    {{ m.field('Священник', md.priest ?? null) }}
+    {{ m.field('Сословие', md.estate_type ?? null) }}
+    {{ m.field('Глава семьи', md.household_head ?? null) }}
+    {{ m.list('Члены семьи', md.household_members ?? []) }}
+    {{ m.field('Причина неисповеди', md.not_confessed_reason ?? null) }}
+{{ m.card_end() }}

@@ -1,0 +1,17 @@
+{% import 'documents/_metadata/_macros.html.twig' as m %}
+
+{{ m.card_start('Сведения о публикации', 'bi-newspaper') }}
+    {{ m.field('Издание', md.publication_name ?? null) }}
+    {{ m.field('Дата выпуска', md.publication_date ?? null) }}
+    {{ m.field('Выпуск №', md.issue_number ?? null) }}
+    {{ m.field('Страница', md.page_number ?? null) }}
+    {{ m.field('Автор', md.author ?? null) }}
+    {{ m.list('Упомянутые лица', md.mentioned_persons ?? []) }}
+    {{ m.field('Темы', md.topics ?? null) }}
+    {% if md.summary is defined and md.summary %}
+        <div class="mt-2">
+            <div class="text-muted small mb-1">Краткое содержание</div>
+            <div class="small" style="white-space: pre-wrap;">{{ md.summary }}</div>
+        </div>
+    {% endif %}
+{{ m.card_end() }}

@@ -1,0 +1,17 @@
+{% import 'documents/_metadata/_macros.html.twig' as m %}
+
+{{ m.card_start('Судовой журнал', 'bi-water') }}
+    {{ m.field('Судно', md.ship_name ?? null) }}
+    {{ m.field('Тип', md.ship_type ?? null) }}
+    {{ m.field('Капитан', md.captain ?? null) }}
+    {{ m.field('Дата рейса', md.voyage_date ?? null) }}
+    {{ m.field('Порт отправления', md.port_departure ?? null) }}
+    {{ m.field('Порт прибытия', md.port_arrival ?? null) }}
+    {{ m.list('Пассажиры', md.passengers ?? []) }}
+    {% if md.notes is defined and md.notes %}
+        <div class="mt-2">
+            <div class="text-muted small mb-1">Заметки</div>
+            <div class="small" style="white-space: pre-wrap;">{{ md.notes }}</div>
+        </div>
+    {% endif %}
+{{ m.card_end() }}

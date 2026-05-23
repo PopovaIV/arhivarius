@@ -1,0 +1,26 @@
+{% import 'documents/_metadata/_macros.html.twig' as m %}
+
+{{ m.card_start('Эмиграционные сведения', 'bi-globe') }}
+    {% if md.document_subtype is defined %}
+        {% set sub_labels = {
+            foreign_passport: 'Заграничный паспорт',
+            exit_petition: 'Прошение о выезде',
+            emigration_permit: 'Разрешение на эмиграцию',
+            ship_ticket: 'Корабельный билет',
+            naturalization: 'Декларация о натурализации',
+            other: 'Другое',
+        } %}
+        {{ m.field('Тип документа', sub_labels[md.document_subtype] ?? md.document_subtype) }}
+    {% endif %}
+    {{ m.field('Эмигрант', md.person_name ?? null) }}
+    {{ m.field('Возраст', md.age ?? null) }}
+    {{ m.field('Откуда', md.origin ?? null) }}
+    {{ m.field('Страна назначения', md.destination_country ?? null) }}
+    {{ m.field('Город / штат', md.destination_city ?? null) }}
+    {{ m.field('Дата выезда', md.emigration_date ?? null) }}
+    {{ m.field('Порт отправления', md.port_departure ?? null) }}
+    {{ m.field('Порт прибытия', md.port_arrival ?? null) }}
+    {{ m.field('Судно', md.ship_name ?? null) }}
+    {{ m.list('Сопровождающие', md.family_members ?? []) }}
+    {{ m.field('Причина выезда', md.reason ?? null) }}
+{{ m.card_end() }}

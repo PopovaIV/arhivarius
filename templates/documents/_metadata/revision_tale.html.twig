@@ -1,0 +1,18 @@
+{% import 'documents/_metadata/_macros.html.twig' as m %}
+
+{{ m.card_start('Ревизская сказка', 'bi-people') }}
+    {% if md.revision_number is defined %}
+        {% set rev_labels = {
+            1: 'I (1719)', 2: 'II (1744)', 3: 'III (1762)', 4: 'IV (1782)', 5: 'V (1795)',
+            6: 'VI (1811)', 7: 'VII (1816)', 8: 'VIII (1834)', 9: 'IX (1850)', 10: 'X (1858)',
+        } %}
+        {{ m.field('Ревизия', rev_labels[md.revision_number] ?? md.revision_number) }}
+    {% endif %}
+    {{ m.field('Губерния', md.province ?? null) }}
+    {{ m.field('Уезд', md.district ?? null) }}
+    {{ m.field('Селение', md.settlement ?? null) }}
+    {{ m.field('Сословие', md.estate_type ?? null) }}
+    {{ m.field('Помещик', md.landlord ?? null) }}
+    {{ m.field('Глава семьи', md.household_head ?? null) }}
+    {{ m.list('Состав двора', md.household_members ?? []) }}
+{{ m.card_end() }}

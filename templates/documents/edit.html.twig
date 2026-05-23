@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+{% block title %}Изменить: {{ document.title }}{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <a href="{{ path('documents_show', {id: document.id}) }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> К документу
+        </a>
+        <h2 class="mt-1 mb-4"><i class="bi bi-pencil"></i> Изменить документ</h2>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                {{ form_start(form, {attr: {enctype: 'multipart/form-data'}}) }}
+
+                <h5 class="text-muted mb-3"><i class="bi bi-tag"></i> Базовые сведения</h5>
+                {{ form_row(form.title) }}
+                {{ form_row(form.description) }}
+                <div class="row">
+                    <div class="col-md-6">{{ form_row(form.documentDate) }}</div>
+                    <div class="col-md-3">{{ form_row(form.documentYear) }}</div>
+                    <div class="col-md-3">{{ form_row(form.datePrecision) }}</div>
+                </div>
+                {{ form_row(form.place) }}
+                {{ form_row(form.archiveReference) }}
+
+                {% if form.metadata is defined %}
+                <hr>
+                <h5 class="text-muted mb-3"><i class="bi {{ document.category.icon }}"></i> Сведения категории</h5>
+                {{ form_widget(form.metadata) }}
+                {% endif %}
+
+                <hr>
+                <h5 class="text-muted mb-3"><i class="bi bi-paperclip"></i> Добавить файлы</h5>
+                <p class="small text-muted">Существующие файлы можно удалить со страницы документа.</p>
+                {{ form_row(form.uploadFiles) }}
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ path('documents_show', {id: document.id}) }}" class="btn btn-outline-secondary">Отмена</a>
+                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if document.category.value == 'metric_book' %}
+    {% include 'documents/_metric_switch_script.html.twig' %}
+{% endif %}
+{% endblock %}

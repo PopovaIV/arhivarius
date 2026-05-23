@@ -1,0 +1,48 @@
+{% extends 'base.html.twig' %}
+{% block title %}История пользователя {{ subject.username }} — Админ{% endblock %}
+
+{% block body %}
+{% set hours = (total_seconds / 3600)|round(1) %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-person-badge"></i> {{ subject.displayName }} <small class="text-muted">({{ subject.username }})</small></h2>
+    <a href="{{ path('admin_activity_index') }}" class="btn btn-outline-secondary btn-sm">← К общему журналу</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="text-muted small">Всего на сайте</div>
+                <div class="fs-3">{{ hours }} ч</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="text-muted small">Последний вход</div>
+                <div class="fs-6">{{ subject.lastLoginAt ? subject.lastLoginAt|date('d.m.Y H:i') : 'никогда' }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="text-muted small">Создан</div>
+                <div class="fs-6">{{ subject.createdAt|date('d.m.Y') }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="text-muted small">Действий показано</div>
+                <div class="fs-3">{{ items|length }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'admin/dashboard/_log_table.html.twig' with {logs: items} %}
+{% endblock %}

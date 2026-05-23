@@ -1,0 +1,21 @@
+{% block javascripts %}
+{{ parent() }}
+<script>
+(function() {
+    const form = document.querySelector('form');
+    if (!form) return;
+    const select = form.querySelector('select[data-metric-record-target="select"]');
+    if (!select) return;
+
+    const update = () => {
+        const value = select.value;
+        form.querySelectorAll('.metric-block').forEach(el => {
+            const shouldShow = el.dataset.metricBlock === value;
+            el.style.display = shouldShow ? '' : 'none';
+        });
+    };
+    select.addEventListener('change', update);
+    update();
+})();
+</script>
+{% endblock %}

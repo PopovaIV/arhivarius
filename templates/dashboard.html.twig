@@ -1,0 +1,95 @@
+{% extends 'base.html.twig' %}
+{% block title %}Главная — {{ app_name }}{% endblock %}
+
+{% block body %}
+<div class="container">
+    <h1 class="mb-3">Здравствуйте, {{ app.user.displayName }}!</h1>
+    <p class="text-muted mb-4">Семейный архив. Выберите раздел.</p>
+
+    <h5 class="mb-3 text-muted"><i class="bi bi-folder"></i> Документы</h5>
+    <div class="row g-3 mb-5">
+        {% for cat in document_categories %}
+        <div class="col-md-4 col-lg-3">
+            <a href="{{ path('documents_index', {slug: cat.slug}) }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi {{ cat.icon }} fs-2 text-primary"></i>
+                        <h6 class="card-title mt-2 text-dark">{{ cat.label }}</h6>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <h5 class="mb-3 text-muted"><i class="bi bi-collection"></i> Другие разделы</h5>
+    <div class="row g-3">
+        <div class="col-md-4 col-lg-3">
+            <a href="{{ path('books_index') }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-book fs-2 text-primary"></i>
+                        <h6 class="card-title mt-2 text-dark">Библиотека</h6>
+                        <p class="card-text text-muted small">Книги с чтением и поиском</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <a href="{{ path('photos_index') }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-images fs-2 text-primary"></i>
+                        <h6 class="card-title mt-2 text-dark">Фотоальбом</h6>
+                        <p class="card-text text-muted small">Снимки предков с тегами</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <a href="{{ path('persons_index') }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-people fs-2 text-primary"></i>
+                        <h6 class="card-title mt-2 text-dark">Реестр людей</h6>
+                        <p class="card-text text-muted small">Карточки предков и фотографии</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <a href="{{ path('genealogy_index') }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-diagram-3 fs-2 text-primary"></i>
+                        <h6 class="card-title mt-2 text-dark">Древо</h6>
+                        <p class="card-text text-muted small">Родственные связи + GEDCOM</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <a href="{{ path('chat_index') }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-chat fs-2 text-primary"></i>
+                        <h6 class="card-title mt-2 text-dark">Чат</h6>
+                        <p class="card-text text-muted small">Общий и личные сообщения</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <a href="{{ path('links_index') }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-link-45deg fs-2 text-primary"></i>
+                        <h6 class="card-title mt-2 text-dark">Ссылки</h6>
+                        <p class="card-text text-muted small">Внешние архивы и ресурсы</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

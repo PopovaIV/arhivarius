@@ -1,0 +1,449 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ photo.title }} — Фотоальбом{% endblock %}
+
+{% block stylesheets %}
+<style>
+    #photo-frame {
+        position: relative;
+        display: inline-block;
+        max-width: 100%;
+        line-height: 0;
+        background: #000;
+        user-select: none;
+    }
+    #photo-frame img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+    }
+    .face-tag {
+        position: absolute;
+        border: 2px solid rgba(255, 255, 255, 0.85);
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+        border-radius: 2px;
+        cursor: pointer;
+        transition: border-color 0.15s;
+    }
+    .face-tag:hover { border-color: #ffc107; }
+    .face-tag .face-label {
+        position: absolute;
+        bottom: -1.6rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.85);
+        color: #fff;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.78rem;
+        white-space: nowrap;
+        border-radius: 2px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s;
+        line-height: normal;
+    }
+    .face-tag:hover .face-label,
+    .face-tag.show-label .face-label { opacity: 1; pointer-events: auto; }
+    .face-tag .face-label a { color: #fff; text-decoration: none; }
+    .face-tag .face-label a:hover { text-decoration: underline; }
+
+    /* Режим рисования рамки */
+    #photo-frame.tagging-mode { cursor: crosshair; }
+    .drawing-box {
+        position: absolute;
+        border: 2px dashed #ffc107;
+        background: rgba(255, 193, 7, 0.15);
+        pointer-events: none;
+    }
+
+    /* Модалка выбора человека */
+    .person-picker { max-height: 300px; overflow-y: auto; }
+    .person-picker .person-item { padding: 0.4rem 0.75rem; border-bottom: 1px solid #e9ecef; cursor: pointer; }
+    .person-picker .person-item:hover { background: #f8f9fa; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <a href="{{ path('photos_index') }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> Фотоальбом
+        </a>
+        <h2 class="mt-1">{{ photo.title }}</h2>
+    </div>
+    <div class="btn-group">
+        {% if is_granted('photo_tag', photo) %}
+        <button id="toggle-tagging" class="btn btn-outline-warning">
+            <i class="bi bi-bounding-box"></i> Отметить человека
+        </button>
+        {% endif %}
+        {% if is_granted('photo_edit', photo) %}
+        <a href="{{ path('photos_edit', {id: photo.id}) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil"></i>
+        </a>
+        {% endif %}
+        {% if is_granted('photo_delete', photo) %}
+        <form method="post" action="{{ path('photos_delete', {id: photo.id}) }}"
+              onsubmit="return confirm('Переместить фото в корзину?');">
+            <input type="hidden" name="_token" value="{{ csrf_token('delete-photo-' ~ photo.id) }}">
+            <button class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-9">
+        <div id="tagging-hint" class="alert alert-warning d-none">
+            <i class="bi bi-bounding-box"></i> <strong>Режим тегирования.</strong>
+            Обведите рамкой лицо человека на фото, затем выберите его из списка или создайте нового.
+            <button id="cancel-tagging" class="btn btn-sm btn-link p-0 ms-2">Отменить</button>
+        </div>
+
+        <div class="text-center bg-dark p-2 rounded">
+            <div id="photo-frame">
+                <img id="photo-image" src="{{ path('photos_image', {id: photo.id}) }}" alt="{{ photo.title }}"
+                     data-photo-width="{{ photo.imageWidth }}" data-photo-height="{{ photo.imageHeight }}">
+                {# Теги будут отрисованы JS-ом #}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3">
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-3">Сведения</h6>
+                <dl class="row mb-0 small">
+                    {% if photo.takenDate or photo.takenYear %}
+                        <dt class="col-5">Когда</dt>
+                        <dd class="col-7">{{ photo.takenDate ?? photo.takenYear }}</dd>
+                    {% endif %}
+                    {% if photo.place %}
+                        <dt class="col-5">Где</dt>
+                        <dd class="col-7">{{ photo.place }}</dd>
+                    {% endif %}
+                    <dt class="col-5">Добавил</dt>
+                    <dd class="col-7">{{ photo.createdBy.displayName }}<br><span class="text-muted">{{ photo.createdAt|date('d.m.Y') }}</span></dd>
+                </dl>
+            </div>
+        </div>
+
+        {% if photo.description %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Описание</h6>
+                <div style="white-space: pre-wrap;">{{ photo.description }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">
+                    <i class="bi bi-people"></i> Отмеченные люди (<span id="tag-count">0</span>)
+                </h6>
+                <div id="tag-list" class="small"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Модалка выбора человека для нового тега #}
+<div class="modal fade" id="personPickerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Кто на фото?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input id="person-search" type="search" class="form-control mb-2" placeholder="Начните вводить имя...">
+                <div id="person-results" class="person-picker border rounded"></div>
+                <hr>
+                <div class="small text-muted mb-2">Не нашли? Создайте новую запись:</div>
+                <div class="input-group">
+                    <input id="new-person-name" type="text" class="form-control" placeholder="Полное имя нового человека">
+                    <button id="create-person-btn" class="btn btn-success">
+                        <i class="bi bi-plus-lg"></i> Создать и отметить
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const TAGS_URL = {{ path('photos_tags_list', {id: photo.id})|json_encode|raw }};
+    const TAGS_CREATE_URL = TAGS_URL;
+    const TAGS_DELETE_URL_TPL = {{ path('photos_tags_delete', {photoId: photo.id, tagId: 0})|json_encode|raw }};
+    const PERSON_AUTOCOMPLETE_URL = {{ path('persons_autocomplete')|json_encode|raw }};
+    const PERSON_SHOW_URL_TPL = {{ path('persons_show', {id: 0})|json_encode|raw }};
+    const CAN_TAG = {{ is_granted('photo_tag', photo) ? 'true' : 'false' }};
+
+    const frame = document.getElementById('photo-frame');
+    const img = document.getElementById('photo-image');
+    const tagList = document.getElementById('tag-list');
+    const tagCount = document.getElementById('tag-count');
+    const toggleTaggingBtn = document.getElementById('toggle-tagging');
+    const cancelTaggingBtn = document.getElementById('cancel-tagging');
+    const taggingHint = document.getElementById('tagging-hint');
+    const personPickerModal = document.getElementById('personPickerModal');
+    const personSearch = document.getElementById('person-search');
+    const personResults = document.getElementById('person-results');
+    const newPersonName = document.getElementById('new-person-name');
+    const createPersonBtn = document.getElementById('create-person-btn');
+
+    let tags = [];
+    let taggingMode = false;
+    let drawingStart = null;
+    let drawingBox = null;
+    let pendingBox = null; // нормализованные координаты ожидающего тега
+
+    // === Загрузка и отрисовка тегов ===
+    async function loadTags() {
+        try {
+            const res = await fetch(TAGS_URL, { credentials: 'same-origin' });
+            const data = await res.json();
+            tags = data.items || [];
+            renderTags();
+        } catch (e) { console.warn(e); }
+    }
+
+    function renderTags() {
+        // Чистим старые рамки на фото
+        frame.querySelectorAll('.face-tag').forEach(el => el.remove());
+        tags.forEach(tag => drawTag(tag));
+        renderTagList();
+        tagCount.textContent = tags.length;
+    }
+
+    function drawTag(tag) {
+        const el = document.createElement('div');
+        el.className = 'face-tag';
+        el.dataset.tagId = tag.id;
+        // Координаты — в долях, переводим в %
+        el.style.left = (tag.x * 100) + '%';
+        el.style.top = (tag.y * 100) + '%';
+        el.style.width = (tag.width * 100) + '%';
+        el.style.height = (tag.height * 100) + '%';
+
+        const personUrl = PERSON_SHOW_URL_TPL.replace('/0', '/' + tag.person_id);
+        const lifespan = tag.person_lifespan ? ` <span style="opacity:0.7">(${escapeHtml(tag.person_lifespan)})</span>` : '';
+        el.innerHTML = `
+            <div class="face-label">
+                <a href="${personUrl}">${escapeHtml(tag.person_name)}</a>${lifespan}
+                ${CAN_TAG ? `<button class="btn btn-sm btn-link text-warning p-0 ms-2 delete-tag-btn" data-tag-id="${tag.id}" title="Удалить тег">×</button>` : ''}
+            </div>
+        `;
+        frame.appendChild(el);
+    }
+
+    function renderTagList() {
+        if (tags.length === 0) {
+            tagList.innerHTML = '<div class="text-muted">Никто пока не отмечен</div>';
+            return;
+        }
+        tagList.innerHTML = tags.map(tag => {
+            const personUrl = PERSON_SHOW_URL_TPL.replace('/0', '/' + tag.person_id);
+            return `
+                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                    <a href="${personUrl}" class="text-decoration-none">
+                        <i class="bi bi-person-circle"></i> ${escapeHtml(tag.person_name)}
+                    </a>
+                    ${CAN_TAG ? `<button class="btn btn-sm btn-link text-danger p-0 delete-tag-btn" data-tag-id="${tag.id}">×</button>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Делегирование клика по кнопке удаления тега
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.delete-tag-btn');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm('Снять тег с фотографии?')) return;
+        const id = btn.dataset.tagId;
+        try {
+            const url = TAGS_DELETE_URL_TPL.replace(/\/0$/, '/' + id);
+            const res = await fetch(url, { method: 'DELETE', credentials: 'same-origin' });
+            if (res.ok) await loadTags();
+        } catch (e) { console.warn(e); }
+    });
+
+    // === Режим тегирования ===
+    if (toggleTaggingBtn) {
+        toggleTaggingBtn.addEventListener('click', () => {
+            taggingMode = !taggingMode;
+            frame.classList.toggle('tagging-mode', taggingMode);
+            taggingHint.classList.toggle('d-none', !taggingMode);
+            toggleTaggingBtn.classList.toggle('active', taggingMode);
+        });
+    }
+    if (cancelTaggingBtn) {
+        cancelTaggingBtn.addEventListener('click', () => {
+            taggingMode = false;
+            frame.classList.remove('tagging-mode');
+            taggingHint.classList.add('d-none');
+            toggleTaggingBtn.classList.remove('active');
+            cleanupDrawing();
+        });
+    }
+
+    // Рисование рамки мышью
+    frame.addEventListener('mousedown', (e) => {
+        if (!taggingMode) return;
+        if (e.target.closest('.face-tag')) return;
+        e.preventDefault();
+        const rect = frame.getBoundingClientRect();
+        drawingStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        drawingBox = document.createElement('div');
+        drawingBox.className = 'drawing-box';
+        drawingBox.style.left = drawingStart.x + 'px';
+        drawingBox.style.top = drawingStart.y + 'px';
+        drawingBox.style.width = '0px';
+        drawingBox.style.height = '0px';
+        frame.appendChild(drawingBox);
+    });
+
+    frame.addEventListener('mousemove', (e) => {
+        if (!drawingStart || !drawingBox) return;
+        const rect = frame.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const left = Math.min(drawingStart.x, cx);
+        const top = Math.min(drawingStart.y, cy);
+        const width = Math.abs(cx - drawingStart.x);
+        const height = Math.abs(cy - drawingStart.y);
+        drawingBox.style.left = left + 'px';
+        drawingBox.style.top = top + 'px';
+        drawingBox.style.width = width + 'px';
+        drawingBox.style.height = height + 'px';
+    });
+
+    frame.addEventListener('mouseup', (e) => {
+        if (!drawingStart || !drawingBox) return;
+        const rect = frame.getBoundingClientRect();
+        const left = parseFloat(drawingBox.style.left);
+        const top = parseFloat(drawingBox.style.top);
+        const w = parseFloat(drawingBox.style.width);
+        const h = parseFloat(drawingBox.style.height);
+
+        // Если рамка слишком маленькая — игнорируем
+        if (w < 15 || h < 15) {
+            cleanupDrawing();
+            return;
+        }
+        // Нормализуем в доли (0–1)
+        pendingBox = {
+            x: left / rect.width,
+            y: top / rect.height,
+            width: w / rect.width,
+            height: h / rect.height,
+        };
+        openPersonPicker();
+    });
+
+    function cleanupDrawing() {
+        drawingStart = null;
+        if (drawingBox) {
+            drawingBox.remove();
+            drawingBox = null;
+        }
+    }
+
+    // === Модалка выбора человека ===
+    let modalInstance = null;
+    function openPersonPicker() {
+        if (!modalInstance) modalInstance = new bootstrap.Modal(personPickerModal);
+        personSearch.value = '';
+        newPersonName.value = '';
+        personResults.innerHTML = '<div class="p-3 text-muted small">Начните вводить имя для поиска…</div>';
+        modalInstance.show();
+        setTimeout(() => personSearch.focus(), 100);
+    }
+
+    personPickerModal.addEventListener('hidden.bs.modal', () => {
+        cleanupDrawing();
+        pendingBox = null;
+    });
+
+    let acTimer = null;
+    personSearch.addEventListener('input', () => {
+        clearTimeout(acTimer);
+        const q = personSearch.value.trim();
+        if (q === '') {
+            personResults.innerHTML = '<div class="p-3 text-muted small">Начните вводить имя для поиска…</div>';
+            return;
+        }
+        acTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(PERSON_AUTOCOMPLETE_URL + '?q=' + encodeURIComponent(q), {
+                    credentials: 'same-origin',
+                });
+                const data = await res.json();
+                renderPersonResults(data.items || []);
+            } catch (e) { console.warn(e); }
+        }, 200);
+    });
+
+    function renderPersonResults(items) {
+        if (items.length === 0) {
+            personResults.innerHTML = '<div class="p-3 text-muted small">Никого не найдено. Создайте новую запись ниже.</div>';
+            return;
+        }
+        personResults.innerHTML = items.map(p => `
+            <div class="person-item" data-person-id="${p.id}">
+                <strong>${escapeHtml(p.name)}</strong>
+                ${p.lifespan && p.lifespan !== '?' ? ` <span class="text-muted small">${escapeHtml(p.lifespan)}</span>` : ''}
+            </div>
+        `).join('');
+        personResults.querySelectorAll('.person-item').forEach(el => {
+            el.addEventListener('click', () => createTag({ person_id: Number(el.dataset.personId) }));
+        });
+    }
+
+    createPersonBtn.addEventListener('click', () => {
+        const name = newPersonName.value.trim();
+        if (name === '') {
+            alert('Введите имя нового человека');
+            return;
+        }
+        createTag({ new_person_name: name });
+    });
+
+    async function createTag(personData) {
+        if (!pendingBox) return;
+        try {
+            const res = await fetch(TAGS_CREATE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify(Object.assign({}, pendingBox, personData)),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                alert('Не удалось добавить тег: ' + (err.error || res.status));
+                return;
+            }
+            modalInstance.hide();
+            await loadTags();
+        } catch (e) { console.warn(e); }
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        })[c]);
+    }
+
+    // Загружаем теги после полной загрузки изображения,
+    // чтобы рамки сразу легли правильно
+    if (img.complete) loadTags();
+    else img.addEventListener('load', loadTags);
+})();
+</script>
+{% endblock %}

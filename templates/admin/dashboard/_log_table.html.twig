@@ -1,0 +1,34 @@
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Время</th>
+                    <th>Действие</th>
+                    <th>Объект</th>
+                    <th>Детали</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in logs %}
+                <tr>
+                    <td class="small text-nowrap">{{ log.createdAt|date('d.m.Y H:i:s') }}</td>
+                    <td><code>{{ log.action }}</code></td>
+                    <td class="small">{% if log.entityType %}{{ log.entityType }}#{{ log.entityId }}{% endif %}</td>
+                    <td class="small text-muted">
+                        {% if log.metadata %}
+                            {% for k, v in log.metadata %}
+                                <span class="me-2"><strong>{{ k }}:</strong> {{ v|json_encode }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                    <td class="small text-muted">{{ log.ip }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5" class="text-center text-muted py-4">Активности нет</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

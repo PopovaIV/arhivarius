@@ -1,0 +1,142 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ document.title }} — {{ app_name }}{% endblock %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <a href="{{ path('documents_index', {slug: document.category.slug}) }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> {{ document.category.label }}
+        </a>
+        <h2 class="mt-1">
+            <i class="bi {{ document.category.icon }}"></i> {{ document.title }}
+        </h2>
+    </div>
+    <div class="btn-group">
+        {% if is_granted('edit', document) %}
+            <a href="{{ path('documents_edit', {id: document.id}) }}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Изменить
+            </a>
+        {% endif %}
+        {% if is_granted('delete', document) %}
+            <form method="post" action="{{ path('documents_delete', {id: document.id}) }}"
+                  onsubmit="return confirm('Переместить документ в корзину?');">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete-doc-' ~ document.id) }}">
+                <button class="btn btn-outline-danger">
+                    <i class="bi bi-trash"></i> Удалить
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-3">Атрибуты</h6>
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Категория</dt>
+                    <dd class="col-sm-7">{{ document.category.label }}</dd>
+
+                    {% if document.documentDate or document.documentYear %}
+                    <dt class="col-sm-5">Дата</dt>
+                    <dd class="col-sm-7">
+                        {{ document.documentDate ?? document.documentYear }}
+                        <div class="small text-muted">{{ document.datePrecision.label }}</div>
+                    </dd>
+                    {% endif %}
+
+                    {% if document.place %}
+                    <dt class="col-sm-5">Место</dt>
+                    <dd class="col-sm-7">{{ document.place }}</dd>
+                    {% endif %}
+
+                    {% if document.archiveReference %}
+                    <dt class="col-sm-5">Шифр</dt>
+                    <dd class="col-sm-7"><code class="small">{{ document.archiveReference }}</code></dd>
+                    {% endif %}
+
+                    <dt class="col-sm-5">Добавил</dt>
+                    <dd class="col-sm-7">
+                        {{ document.createdBy.displayName }}
+                        <div class="small text-muted">{{ document.createdAt|date('d.m.Y H:i') }}</div>
+                    </dd>
+
+                    {% if document.updatedAt %}
+                    <dt class="col-sm-5">Изменён</dt>
+                    <dd class="col-sm-7 small text-muted">{{ document.updatedAt|date('d.m.Y H:i') }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        {% if document.description %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Описание</h6>
+                <div class="text-body" style="white-space: pre-wrap;">{{ document.description }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-8">
+        {% if document.metadata %}
+            {% include 'documents/_metadata/' ~ document.category.value ~ '.html.twig' with {md: document.metadata} only %}
+        {% endif %}
+
+        <h5 class="mb-3 mt-4"><i class="bi bi-paperclip"></i> Прикреплённые файлы ({{ document.files|length }})</h5>
+
+        {% if document.files|length == 0 %}
+            <div class="alert alert-light border">Файлов не прикреплено</div>
+        {% else %}
+            <div class="row g-3">
+                {% for f in document.files %}
+                    <div class="col-md-6">
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <div class="d-flex">
+                                    <div class="me-3">
+                                        {% if f.image %}
+                                            <i class="bi bi-image fs-1 text-primary"></i>
+                                        {% elseif f.pdf %}
+                                            <i class="bi bi-file-pdf fs-1 text-danger"></i>
+                                        {% else %}
+                                            <i class="bi bi-file-earmark fs-1 text-muted"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-semibold text-break">{{ f.originalName }}</div>
+                                        <div class="small text-muted mb-2">
+                                            {{ (f.sizeBytes / 1024 / 1024)|number_format(2) }} МБ
+                                        </div>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ path('documents_file_preview', {docId: document.id, fileId: f.id}) }}"
+                                               target="_blank" class="btn btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{{ path('documents_file_download', {docId: document.id, fileId: f.id}) }}"
+                                               class="btn btn-outline-secondary">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+                                            {% if is_granted('edit', document) %}
+                                            <form method="post" action="{{ path('documents_file_delete', {docId: document.id, fileId: f.id}) }}" class="d-inline"
+                                                  onsubmit="return confirm('Удалить файл «{{ f.originalName|e('js') }}»?');">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('delete-file-' ~ f.id) }}">
+                                                <button class="btn btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

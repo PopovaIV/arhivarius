@@ -1,0 +1,59 @@
+{% extends 'base.html.twig' %}
+{% block title %}Импорт GEDCOM — Генеалогия{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <a href="{{ path('genealogy_index') }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> Генеалогическое древо
+        </a>
+        <h2 class="mt-1 mb-4"><i class="bi bi-upload"></i> Импорт GEDCOM</h2>
+
+        <div class="alert alert-light border">
+            <p class="mb-1"><strong>GEDCOM</strong> — стандартный формат обмена генеалогических данных.</p>
+            <p class="mb-0 small text-muted">Файлы поддерживаются Familio, MyHeritage, FamilySearch, Ancestry, Geni и большинством генеалогических программ. Расширение <code>.ged</code> или <code>.gedcom</code>.</p>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="_token" value="{{ csrf_token('gedcom-import') }}">
+                    <div class="mb-3">
+                        <label class="form-label">Файл GEDCOM</label>
+                        <input type="file" name="gedcom_file" class="form-control" accept=".ged,.gedcom,text/plain" required>
+                        <div class="form-text">Максимум 50 МБ. Кодировка UTF-8 (если файл в Windows-1251 — лучше предварительно перекодировать).</div>
+                    </div>
+                    <div class="alert alert-warning small">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Все люди из файла будут добавлены как новые записи. Проверка на дубли по имени не производится — если что-то уже есть в реестре, после импорта будут одноимённые записи. Перед загрузкой большого древа лучше очистить тестовый реестр.
+                    </div>
+                    <button type="submit" class="btn btn-primary">Загрузить и импортировать</button>
+                </form>
+            </div>
+        </div>
+
+        {% if stats %}
+            <div class="card shadow-sm mt-3 border-success">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-check-circle text-success"></i> Результаты импорта</h5>
+                    <ul class="mb-3">
+                        <li>Создано записей о людях: <strong>{{ stats.persons_created }}</strong></li>
+                        <li>Создано родственных связей: <strong>{{ stats.relations_created }}</strong></li>
+                    </ul>
+                    {% if stats.errors|length > 0 %}
+                        <details>
+                            <summary class="text-warning"><strong>Ошибок: {{ stats.errors|length }}</strong></summary>
+                            <ul class="small mt-2">
+                                {% for err in stats.errors %}
+                                    <li>{{ err }}</li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+                    {% endif %}
+                    <a href="{{ path('genealogy_index') }}" class="btn btn-primary mt-2">Посмотреть древо</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

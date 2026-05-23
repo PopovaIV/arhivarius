@@ -1,0 +1,336 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ person.fullName }} — Люди{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .photo-tile { aspect-ratio: 1; overflow: hidden; background: #f1f3f5; border-radius: 0.5rem; }
+    .photo-tile img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+    .photo-tile:hover img { transform: scale(1.03); }
+    .relation-group h6 { color: #6c757d; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .relation-card { display: flex; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid #e9ecef; border-radius: 0.4rem; margin-bottom: 0.4rem; transition: background 0.15s; }
+    .relation-card:hover { background: #f8f9fa; }
+    .relation-card .name { flex-grow: 1; }
+    .person-picker { max-height: 250px; overflow-y: auto; }
+    .person-picker .person-item { padding: 0.4rem 0.75rem; border-bottom: 1px solid #e9ecef; cursor: pointer; }
+    .person-picker .person-item:hover { background: #f8f9fa; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <a href="{{ path('persons_index') }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> Реестр людей
+        </a>
+        <h2 class="mt-1"><i class="bi bi-person-circle"></i> {{ person.fullName }}</h2>
+        {% if person.aliases %}<div class="text-muted">{{ person.aliases }}</div>{% endif %}
+    </div>
+    {% set can_edit = is_granted('ROLE_ADMIN') or person.createdBy.id == app.user.id %}
+    <div class="btn-group">
+        <a href="{{ path('genealogy_index') }}?person={{ person.id }}" class="btn btn-outline-primary">
+            <i class="bi bi-diagram-3"></i> Древо
+        </a>
+        {% if can_edit %}
+            <a href="{{ path('persons_edit', {id: person.id}) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-pencil"></i> Изменить
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-3">Биография</h6>
+                <dl class="row mb-0 small">
+                    <dt class="col-5">Пол</dt>
+                    <dd class="col-7">{{ person.gender.label }}</dd>
+
+                    {% if person.birthDate or person.birthYear %}
+                        <dt class="col-5">Родился</dt>
+                        <dd class="col-7">
+                            {{ person.birthDate ?? person.birthYear }}
+                            {% if person.birthPlace %}<br><span class="text-muted">{{ person.birthPlace }}</span>{% endif %}
+                        </dd>
+                    {% endif %}
+
+                    {% if person.deathDate or person.deathYear %}
+                        <dt class="col-5">Умер</dt>
+                        <dd class="col-7">
+                            {{ person.deathDate ?? person.deathYear }}
+                            {% if person.deathPlace %}<br><span class="text-muted">{{ person.deathPlace }}</span>{% endif %}
+                        </dd>
+                    {% endif %}
+                </dl>
+
+                {% if person.externalTreeUrl %}
+                    <hr>
+                    <a href="{{ person.externalTreeUrl }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-box-arrow-up-right"></i> Внешнее древо
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if person.notes %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Заметки</h6>
+                <div style="white-space: pre-wrap;">{{ person.notes }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# ============ Родственные связи ============ #}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-subtitle text-muted mb-0"><i class="bi bi-diagram-3"></i> Родственные связи</h6>
+                    {% if is_granted('ROLE_CONTRIBUTOR') %}
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item add-rel" href="#" data-type="parent" data-direction="incoming">Добавить родителя</a></li>
+                            <li><a class="dropdown-item add-rel" href="#" data-type="parent" data-direction="outgoing">Добавить ребёнка</a></li>
+                            <li><a class="dropdown-item add-rel" href="#" data-type="spouse" data-direction="outgoing">Добавить супруга</a></li>
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {# Родители #}
+                <div class="relation-group">
+                    <h6>Родители</h6>
+                    {% if parents|length == 0 %}
+                        <div class="small text-muted mb-2">Не указаны</div>
+                    {% else %}
+                        {% for p in parents %}
+                            {% set rel = null %}
+                            {% for r in all_relations %}
+                                {% if r.type.value == 'parent' and r.fromPerson.id == p.id and r.toPerson.id == person.id %}{% set rel = r %}{% endif %}
+                            {% endfor %}
+                            <div class="relation-card">
+                                <i class="bi bi-person-circle text-muted me-2"></i>
+                                <a href="{{ path('persons_show', {id: p.id}) }}" class="name text-decoration-none">
+                                    {{ p.fullName }} <span class="text-muted small">{{ p.lifespanLabel }}</span>
+                                </a>
+                                {% if rel and (is_granted('ROLE_ADMIN') or rel.createdBy.id == app.user.id) %}
+                                    {% include 'persons/_delete_rel_form.html.twig' with {rel: rel, person_id: person.id} %}
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                {# Супруги #}
+                <div class="relation-group mt-3">
+                    <h6>Супруги</h6>
+                    {% if spouses|length == 0 %}
+                        <div class="small text-muted mb-2">Не указаны</div>
+                    {% else %}
+                        {% for s in spouses %}
+                            {% set rel = null %}
+                            {% for r in all_relations %}
+                                {% if r.type.value == 'spouse' and (
+                                    (r.fromPerson.id == person.id and r.toPerson.id == s.id) or
+                                    (r.fromPerson.id == s.id and r.toPerson.id == person.id)
+                                ) %}{% set rel = r %}{% endif %}
+                            {% endfor %}
+                            <div class="relation-card">
+                                <i class="bi bi-suit-heart text-danger me-2"></i>
+                                <a href="{{ path('persons_show', {id: s.id}) }}" class="name text-decoration-none">
+                                    {{ s.fullName }} <span class="text-muted small">{{ s.lifespanLabel }}</span>
+                                </a>
+                                {% if rel and (is_granted('ROLE_ADMIN') or rel.createdBy.id == app.user.id) %}
+                                    {% include 'persons/_delete_rel_form.html.twig' with {rel: rel, person_id: person.id} %}
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                {# Дети #}
+                <div class="relation-group mt-3">
+                    <h6>Дети</h6>
+                    {% if children|length == 0 %}
+                        <div class="small text-muted">Не указаны</div>
+                    {% else %}
+                        {% for c in children %}
+                            {% set rel = null %}
+                            {% for r in all_relations %}
+                                {% if r.type.value == 'parent' and r.fromPerson.id == person.id and r.toPerson.id == c.id %}{% set rel = r %}{% endif %}
+                            {% endfor %}
+                            <div class="relation-card">
+                                <i class="bi bi-person text-muted me-2"></i>
+                                <a href="{{ path('persons_show', {id: c.id}) }}" class="name text-decoration-none">
+                                    {{ c.fullName }} <span class="text-muted small">{{ c.lifespanLabel }}</span>
+                                </a>
+                                {% if rel and (is_granted('ROLE_ADMIN') or rel.createdBy.id == app.user.id) %}
+                                    {% include 'persons/_delete_rel_form.html.twig' with {rel: rel, person_id: person.id} %}
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <h5 class="mb-3"><i class="bi bi-images"></i> Фотографии ({{ photos|length }})</h5>
+        {% if photos|length == 0 %}
+            <div class="alert alert-light border">Этот человек пока не отмечен ни на одной фотографии.</div>
+        {% else %}
+        <div class="row g-3">
+            {% for ph in photos %}
+                <div class="col-6 col-md-4 col-lg-3">
+                    <a href="{{ path('photos_show', {id: ph.id}) }}" class="d-block position-relative photo-tile shadow-sm">
+                        <img src="{{ path('photos_image', {id: ph.id}) }}" alt="{{ ph.title }}" loading="lazy">
+                    </a>
+                    <div class="small text-muted mt-1 text-truncate">
+                        {{ ph.title }}{% if ph.takenYear %} ({{ ph.takenYear }}){% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# ============ Модалка добавления связи ============ #}
+{% if is_granted('ROLE_CONTRIBUTOR') %}
+<div class="modal fade" id="relPickerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить связь</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="rel-desc" class="alert alert-light border small"></div>
+                <input id="rel-search" type="search" class="form-control mb-2" placeholder="Начните вводить имя...">
+                <div id="rel-results" class="person-picker border rounded mb-3"></div>
+
+                <hr>
+                <div class="small text-muted mb-2">Не нашли? Создайте новую запись:</div>
+                <div class="input-group">
+                    <input id="rel-new-name" type="text" class="form-control" placeholder="Полное имя">
+                    <button id="rel-create-btn" class="btn btn-success">
+                        <i class="bi bi-plus-lg"></i> Создать
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const PERSON_ID = {{ person.id }};
+    const AUTOCOMPLETE_URL = {{ path('persons_autocomplete')|json_encode|raw }};
+    const CREATE_URL = {{ path('genealogy_relation_create', {id: person.id})|json_encode|raw }};
+
+    const modalEl = document.getElementById('relPickerModal');
+    const modal = new bootstrap.Modal(modalEl);
+    const desc = document.getElementById('rel-desc');
+    const search = document.getElementById('rel-search');
+    const results = document.getElementById('rel-results');
+    const newName = document.getElementById('rel-new-name');
+    const createBtn = document.getElementById('rel-create-btn');
+
+    let pending = null; // {type, direction}
+
+    const DESCRIPTIONS = {
+        'parent_incoming': 'Кого отметить как родителя для {{ person.fullName|e('js') }}?',
+        'parent_outgoing': 'Кого отметить как ребёнка для {{ person.fullName|e('js') }}?',
+        'spouse_outgoing': 'Кого отметить как супруга/супругу для {{ person.fullName|e('js') }}?',
+    };
+
+    document.querySelectorAll('.add-rel').forEach(a => {
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            pending = { type: a.dataset.type, direction: a.dataset.direction };
+            desc.textContent = DESCRIPTIONS[pending.type + '_' + pending.direction] || '';
+            search.value = ''; newName.value = '';
+            results.innerHTML = '<div class="p-3 text-muted small">Начните вводить имя для поиска…</div>';
+            modal.show();
+            setTimeout(() => search.focus(), 100);
+        });
+    });
+
+    let acTimer = null;
+    search.addEventListener('input', () => {
+        clearTimeout(acTimer);
+        const q = search.value.trim();
+        if (q === '') {
+            results.innerHTML = '<div class="p-3 text-muted small">Начните вводить имя для поиска…</div>';
+            return;
+        }
+        acTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(AUTOCOMPLETE_URL + '?q=' + encodeURIComponent(q), { credentials: 'same-origin' });
+                const data = await res.json();
+                renderResults(data.items || []);
+            } catch (e) { console.warn(e); }
+        }, 200);
+    });
+
+    function renderResults(items) {
+        // Исключаем самого текущего человека из списка
+        items = items.filter(p => Number(p.id) !== PERSON_ID);
+        if (items.length === 0) {
+            results.innerHTML = '<div class="p-3 text-muted small">Никого не найдено.</div>';
+            return;
+        }
+        results.innerHTML = items.map(p => `
+            <div class="person-item" data-id="${p.id}">
+                <strong>${escapeHtml(p.name)}</strong>
+                ${p.lifespan && p.lifespan !== '?' ? ` <span class="text-muted small">${escapeHtml(p.lifespan)}</span>` : ''}
+            </div>
+        `).join('');
+        results.querySelectorAll('.person-item').forEach(el => {
+            el.addEventListener('click', () => submit({ other_person_id: Number(el.dataset.id) }));
+        });
+    }
+
+    createBtn.addEventListener('click', () => {
+        const name = newName.value.trim();
+        if (name === '') { alert('Введите имя'); return; }
+        submit({ new_person_name: name });
+    });
+
+    async function submit(personRef) {
+        if (!pending) return;
+        const body = Object.assign({ type: pending.type, direction: pending.direction }, personRef);
+        try {
+            const res = await fetch(CREATE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                alert('Не удалось: ' + (data.error || res.status));
+                return;
+            }
+            modal.hide();
+            window.location.reload();
+        } catch (e) { alert('Сетевая ошибка'); }
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        })[c]);
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}

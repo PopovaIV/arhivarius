@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+{% block title %}Изменить: {{ link.title }}{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <a href="{{ path('links_index') }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> Ссылки
+        </a>
+        <h2 class="mt-1 mb-4"><i class="bi bi-pencil"></i> Изменить ссылку</h2>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                {{ form_start(form) }}
+                {{ form_row(form.category) }}
+                {{ form_row(form.title) }}
+                {{ form_row(form.url) }}
+                {{ form_row(form.description) }}
+                {{ form_row(form.tags) }}
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ path('links_index') }}" class="btn btn-outline-secondary">Отмена</a>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
