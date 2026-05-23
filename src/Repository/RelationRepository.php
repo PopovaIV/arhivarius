@@ -86,6 +86,21 @@ class RelationRepository extends ServiceEntityRepository
     }
 
     /**
+     * Все связи с обоими людьми — для in-memory BFS в TreeBuilder.
+     *
+     * @return list<Relation>
+     */
+    public function findAllWithPersons(): array
+    {
+        return $this->createQueryBuilder('r')
+            ->addSelect('fp', 'tp')
+            ->join('r.fromPerson', 'fp')
+            ->join('r.toPerson', 'tp')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Все связи всех людей одним запросом — для рендера древа.
      * Возвращает массивы [from_id, to_id, type].
      *

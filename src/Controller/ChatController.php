@@ -124,6 +124,11 @@ final class ChatController extends AbstractController
         $maxWait = (int) $request->query->get('wait', 0);  // секунд ожидания; 0 — без ожидания
         $maxWait = max(0, min(25, $maxWait));
 
+        // Освобождаем сессионный лок ДО polling-цикла.
+        // Иначе PHP держит файл сессии заблокированным всё время ожидания,
+        // и параллельные запросы этого же пользователя виснут на session_start().
+        $request->getSession()->save();
+
         $deadline = microtime(true) + $maxWait;
         $messages = $this->messages->findSince($channel, $since);
 

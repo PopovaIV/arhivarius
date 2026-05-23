@@ -39,57 +39,61 @@ final readonly class TreeBuilder
 
     /**
      * Граф вокруг конкретного человека — предки и потомки до depth уровней.
+     * Все связи грузятся одним запросом, BFS выполняется в памяти.
      *
      * @return array{nodes: list<array<string,mixed>>, edges: list<array<string,string>>, center_id: string}
      */
     public function buildAround(Person $center, int $depth = 3): array
     {
+        $allRelations = $this->relations->findAllWithPersons();
+
+        // Строим карту людей и adjacency-список из загруженных данных
+        /** @var array<string, Person> $personMap */
+        $personMap = [(string) $center->getId() => $center];
+        /** @var array<string, list<array{0: string, 1: string, 2: string, 3: string}>> $adjacency */
+        $adjacency = [];
+
+        foreach ($allRelations as $r) {
+            $fId = (string) $r->getFromPerson()->getId();
+            $tId = (string) $r->getToPerson()->getId();
+            $personMap[$fId] = $r->getFromPerson();
+            $personMap[$tId] = $r->getToPerson();
+            $type = $r->getType()->value;
+
+            // adjacency[id] = [neighborId, edgeFrom, edgeTo, edgeType]
+            if ($r->getType() === RelationType::Parent) {
+                $adjacency[$tId][] = [$fId, $fId, $tId, $type]; // родитель
+                $adjacency[$fId][] = [$tId, $fId, $tId, $type]; // ребёнок
+            } else {
+                $adjacency[$fId][] = [$tId, $fId, $tId, $type];
+                $adjacency[$tId][] = [$fId, $fId, $tId, $type];
+            }
+        }
+
+        // BFS полностью в памяти — нет SQL в цикле
+        /** @var array<string, Person> $visited */
         $visited = [];
         $edges = [];
         $queue = [[(string) $center->getId(), 0]];
 
         while ($queue !== []) {
             [$id, $level] = array_shift($queue);
-            if (isset($visited[$id])) {
+            if (isset($visited[$id]) || !isset($personMap[$id])) {
                 continue;
             }
-            $person = $this->persons->find($id);
-            if ($person === null) {
-                continue;
-            }
-            $visited[$id] = $person;
+            $visited[$id] = $personMap[$id];
 
-            if ($level >= $depth) {
-                continue;
-            }
-
-            // Родители, дети, супруги — всех добавляем в очередь
-            foreach ($this->relations->parentsOf($person) as $parent) {
-                $pid = (string) $parent->getId();
-                $edges[] = ['from' => $pid, 'to' => $id, 'type' => RelationType::Parent->value];
-                $queue[] = [$pid, $level + 1];
-            }
-            foreach ($this->relations->childrenOf($person) as $child) {
-                $cid = (string) $child->getId();
-                $edges[] = ['from' => $id, 'to' => $cid, 'type' => RelationType::Parent->value];
-                $queue[] = [$cid, $level + 1];
-            }
-            foreach ($this->relations->spousesOf($person) as $spouse) {
-                $sid = (string) $spouse->getId();
-                $edges[] = ['from' => $id, 'to' => $sid, 'type' => RelationType::Spouse->value];
-                $queue[] = [$sid, $level + 1];
+            if ($level < $depth) {
+                foreach ($adjacency[$id] ?? [] as [$nId, $eFrom, $eTo, $eType]) {
+                    $edges[] = ['from' => $eFrom, 'to' => $eTo, 'type' => $eType];
+                    $queue[] = [$nId, $level + 1];
+                }
             }
         }
 
-        $nodes = [];
-        foreach ($visited as $p) {
-            $nodes[] = $this->personToNode($p);
-        }
+        $nodes = array_values(array_map($this->personToNode(...), $visited));
 
-        // Дедуп рёбер — нужно потому что обходим в обе стороны
-        $edges = $this->dedupEdges($edges);
-
-        return ['nodes' => $nodes, 'edges' => $edges, 'center_id' => (string) $center->getId()];
+        return ['nodes' => $nodes, 'edges' => $this->dedupEdges($edges), 'center_id' => (string) $center->getId()];
     }
 
     /**
