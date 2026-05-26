@@ -28,7 +28,7 @@
   }
 
   function init(input) {
-    const files = [];
+    const files = []; // internal File[] accumulator
     const helpText = input.closest('.mb-3, .form-group')?.querySelector('.form-text')?.textContent ?? '';
 
     // --- Build DOM ---
@@ -48,12 +48,22 @@
     const list = document.createElement('div');
     list.className = 'file-dropzone__list mt-2';
 
+    // Separate picker input — used only to open the file dialog.
+    // The original `input` (the form field) is kept in sync via DataTransfer
+    // and is never reset, so its FileList always matches our files[].
+    const picker = document.createElement('input');
+    picker.type = 'file';
+    picker.multiple = true;
+    if (input.accept) picker.accept = input.accept;
+    picker.style.display = 'none';
+
     // Hide original input, place it inside the widget
     input.style.display = 'none';
     input.parentNode.insertBefore(wrapper, input);
     wrapper.appendChild(zone);
     wrapper.appendChild(list);
     wrapper.appendChild(input);
+    wrapper.appendChild(picker);
 
     // --- CSS (injected once) ---
     if (!document.getElementById('file-dropzone-css')) {
@@ -78,6 +88,8 @@
     }
 
     // --- Sync files[] → input.files via DataTransfer ---
+    // We only ever write to input.files here; never call input.value = ''
+    // which would destroy the FileList.
     function syncInput() {
       const dt = new DataTransfer();
       files.forEach(f => dt.items.add(f));
@@ -103,7 +115,9 @@
       if (files.length > 1) {
         const counter = document.createElement('div');
         counter.className = 'file-dropzone__counter';
-        counter.textContent = `Итого: ${files.length} файл${files.length < 5 ? (files.length === 1 ? '' : 'а') : 'ов'}, ${fmtSize(files.reduce((s, f) => s + f.size, 0))}`;
+        const n = files.length;
+        const word = n === 1 ? 'файл' : n < 5 ? 'файла' : 'файлов';
+        counter.textContent = `Итого: ${n} ${word}, ${fmtSize(files.reduce((s, f) => s + f.size, 0))}`;
         list.appendChild(counter);
       }
     }
@@ -117,17 +131,22 @@
           added++;
         }
       }
-      if (added) { syncInput(); renderList(); }
+      if (added) {
+        syncInput();
+        renderList();
+      }
     }
 
-    // --- Events: zone click ---
-    zone.addEventListener('click', () => input.click());
+    // --- Events: zone click opens picker (not the form input) ---
+    zone.addEventListener('click', () => picker.click());
 
-    // --- Events: input change ---
-    input.addEventListener('change', () => {
-      if (input.files.length) addFiles(input.files);
-      // Reset so the same files can be selected again
-      input.value = '';
+    // --- Events: picker change → add to accumulator, reset picker ---
+    picker.addEventListener('change', () => {
+      if (picker.files.length) {
+        addFiles(picker.files);
+      }
+      // Safe to reset picker because it's not the form field
+      picker.value = '';
     });
 
     // --- Events: drag-and-drop ---
