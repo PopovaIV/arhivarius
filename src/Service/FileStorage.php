@@ -86,12 +86,13 @@ final readonly class FileStorage
         }
 
         $filename = bin2hex(random_bytes(8)) . '_' . $safeName . '.' . $extension;
+        $fileSize = $file->getSize();
         $file->move($absoluteDir, $filename);
 
         return [
             'path' => $relativeDir . '/' . $filename,
             'mime' => $mime,
-            'size' => $file->getSize() ?: filesize($absoluteDir . '/' . $filename),
+            'size' => $fileSize ?: filesize($absoluteDir . '/' . $filename),
             'originalName' => $originalName,
         ];
     }
