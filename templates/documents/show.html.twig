@@ -1,6 +1,66 @@
 {% extends 'base.html.twig' %}
 {% block title %}{{ document.title }} — {{ app_name }}{% endblock %}
 
+{% block stylesheets %}
+<style>
+#fileViewer {
+    height: calc(100vh - 260px);
+    min-height: 480px;
+}
+.thumb-strip {
+    width: 120px;
+    min-width: 120px;
+    overflow-y: auto;
+    background: #212529;
+}
+.file-thumb {
+    padding: 4px;
+    cursor: pointer;
+    border-bottom: 1px solid #343a40;
+    user-select: none;
+}
+.file-thumb:hover { background: #2c3238; }
+.file-thumb.active { background: #0d6efd22; outline: 2px solid #0d6efd; outline-offset: -2px; }
+.file-thumb .thumb-img {
+    width: 100%;
+    height: 72px;
+    object-fit: cover;
+    display: block;
+}
+.file-thumb .thumb-icon {
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.file-thumb .thumb-num {
+    color: #adb5bd;
+    font-size: 0.65rem;
+    text-align: center;
+    line-height: 1.6;
+}
+#viewerContent {
+    position: relative;
+    overflow: auto;
+    background: #f8f9fa;
+}
+#viewerImg {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+#viewerPdf {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+</style>
+{% endblock %}
+
 {% block body %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
@@ -85,58 +145,175 @@
             {% include 'documents/_metadata/' ~ document.category.value ~ '.html.twig' with {md: document.metadata} only %}
         {% endif %}
 
-        <h5 class="mb-3 mt-4"><i class="bi bi-paperclip"></i> Прикреплённые файлы ({{ document.files|length }})</h5>
+        <div class="d-flex align-items-center justify-content-between mb-2 mt-3">
+            <h5 class="mb-0"><i class="bi bi-paperclip"></i> Файлы ({{ document.files|length }})</h5>
+        </div>
 
         {% if document.files|length == 0 %}
             <div class="alert alert-light border">Файлов не прикреплено</div>
         {% else %}
-            <div class="row g-3">
-                {% for f in document.files %}
-                    <div class="col-md-6">
-                        <div class="card shadow-sm">
-                            <div class="card-body">
-                                <div class="d-flex">
-                                    <div class="me-3">
-                                        {% if f.image %}
-                                            <i class="bi bi-image fs-1 text-primary"></i>
-                                        {% elseif f.pdf %}
-                                            <i class="bi bi-file-pdf fs-1 text-danger"></i>
-                                        {% else %}
-                                            <i class="bi bi-file-earmark fs-1 text-muted"></i>
-                                        {% endif %}
-                                    </div>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-semibold text-break">{{ f.originalName }}</div>
-                                        <div class="small text-muted mb-2">
-                                            {{ (f.sizeBytes / 1024 / 1024)|number_format(2) }} МБ
-                                        </div>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{{ path('documents_file_preview', {docId: document.id, fileId: f.id}) }}"
-                                               target="_blank" class="btn btn-outline-primary">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            <a href="{{ path('documents_file_download', {docId: document.id, fileId: f.id}) }}"
-                                               class="btn btn-outline-secondary">
-                                                <i class="bi bi-download"></i>
-                                            </a>
-                                            {% if is_granted('edit', document) %}
-                                            <form method="post" action="{{ path('documents_file_delete', {docId: document.id, fileId: f.id}) }}" class="d-inline"
-                                                  onsubmit="return confirm('Удалить файл «{{ f.originalName|e('js') }}»?');">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('delete-file-' ~ f.id) }}">
-                                                <button class="btn btn-outline-danger">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
+            <div class="border rounded overflow-hidden d-flex" id="fileViewer" tabindex="-1">
+
+                {# Полоса миниатюр #}
+                <div class="thumb-strip flex-shrink-0">
+                    {% for f in document.files %}
+                    <div class="file-thumb{% if loop.first %} active{% endif %}"
+                         data-index="{{ loop.index0 }}"
+                         data-preview="{{ path('documents_file_preview', {docId: document.id, fileId: f.id}) }}"
+                         data-download="{{ path('documents_file_download', {docId: document.id, fileId: f.id}) }}"
+                         data-name="{{ f.originalName|e('html_attr') }}"
+                         data-type="{{ f.image ? 'image' : (f.pdf ? 'pdf' : 'other') }}"
+                         {% if is_granted('edit', document) %}
+                         data-delete-url="{{ path('documents_file_delete', {docId: document.id, fileId: f.id}) }}"
+                         data-delete-token="{{ csrf_token('delete-file-' ~ f.id) }}"
+                         data-delete-name="{{ f.originalName|e('html_attr') }}"
+                         {% endif %}
+                         title="{{ f.originalName }}">
+                        {% if f.image %}
+                            <img src="{{ path('documents_file_preview', {docId: document.id, fileId: f.id}) }}"
+                                 class="thumb-img" loading="lazy" alt="{{ loop.index }}">
+                        {% else %}
+                            <div class="thumb-icon">
+                                {% if f.pdf %}
+                                    <i class="bi bi-file-pdf text-danger" style="font-size: 2rem;"></i>
+                                {% else %}
+                                    <i class="bi bi-file-earmark text-secondary" style="font-size: 2rem;"></i>
+                                {% endif %}
                             </div>
+                        {% endif %}
+                        <div class="thumb-num">{{ loop.index }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {# Основная область #}
+                <div class="d-flex flex-column flex-grow-1 overflow-hidden">
+
+                    {# Тулбар #}
+                    <div class="d-flex align-items-center gap-2 px-2 py-1 border-bottom bg-white flex-shrink-0">
+                        <button class="btn btn-sm btn-outline-secondary" id="prevFile" title="Предыдущий (←)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" id="nextFile" title="Следующий (→)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                        <span class="text-muted small text-nowrap" id="fileCounter"></span>
+                        <span class="small text-truncate flex-grow-1 fw-semibold" id="fileName"></span>
+                        <a id="downloadBtn" href="#" class="btn btn-sm btn-outline-secondary" title="Скачать">
+                            <i class="bi bi-download"></i>
+                        </a>
+                        <a id="openBtn" href="#" target="_blank" class="btn btn-sm btn-outline-secondary" title="Открыть в новой вкладке">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
+                        <button id="deleteBtn" class="btn btn-sm btn-outline-danger d-none" type="button" title="Удалить файл">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+
+                    {# Контент #}
+                    <div class="flex-grow-1 overflow-hidden" id="viewerContent">
+                        <img id="viewerImg" src="" alt="" class="d-none">
+                        <iframe id="viewerPdf" src="" class="d-none"></iframe>
+                        <div id="viewerOther" class="d-none h-100 d-flex flex-column align-items-center justify-content-center gap-3">
+                            <i class="bi bi-file-earmark fs-1 text-muted"></i>
+                            <p class="text-muted mb-0">Предпросмотр недоступен</p>
+                            <a id="otherDownloadBtn" href="#" class="btn btn-primary">
+                                <i class="bi bi-download"></i> Скачать
+                            </a>
                         </div>
                     </div>
-                {% endfor %}
+                </div>
             </div>
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+(function () {
+    const thumbs = Array.from(document.querySelectorAll('.file-thumb'));
+    if (!thumbs.length) return;
+
+    const total = thumbs.length;
+    let current = 0;
+
+    const viewer      = document.getElementById('fileViewer');
+    const viewerImg   = document.getElementById('viewerImg');
+    const viewerPdf   = document.getElementById('viewerPdf');
+    const viewerOther = document.getElementById('viewerOther');
+    const counter     = document.getElementById('fileCounter');
+    const fileNameEl  = document.getElementById('fileName');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const openBtn     = document.getElementById('openBtn');
+    const deleteBtn   = document.getElementById('deleteBtn');
+    const prevBtn     = document.getElementById('prevFile');
+    const nextBtn     = document.getElementById('nextFile');
+
+    function show(index) {
+        thumbs[current].classList.remove('active');
+        current = ((index % total) + total) % total;
+        const t = thumbs[current];
+        t.classList.add('active');
+        t.scrollIntoView({ block: 'nearest' });
+
+        counter.textContent = (current + 1) + ' / ' + total;
+        fileNameEl.textContent = t.dataset.name;
+        downloadBtn.href = t.dataset.download;
+        openBtn.href = t.dataset.preview;
+
+        if (t.dataset.deleteUrl) {
+            deleteBtn.classList.remove('d-none');
+        } else {
+            deleteBtn.classList.add('d-none');
+        }
+
+        viewerImg.classList.add('d-none');
+        viewerPdf.classList.add('d-none');
+        viewerOther.classList.add('d-none');
+
+        if (t.dataset.type === 'image') {
+            viewerImg.src = t.dataset.preview;
+            viewerImg.classList.remove('d-none');
+            viewer.focus();
+        } else if (t.dataset.type === 'pdf') {
+            viewerPdf.src = t.dataset.preview;
+            viewerPdf.classList.remove('d-none');
+            viewerPdf.onload = () => viewer.focus();
+            viewer.focus();
+        } else {
+            document.getElementById('otherDownloadBtn').href = t.dataset.download;
+            viewerOther.classList.remove('d-none');
+            viewer.focus();
+        }
+    }
+
+    thumbs.forEach((t, i) => t.addEventListener('click', () => show(i)));
+    prevBtn.addEventListener('click', () => show(current - 1));
+    nextBtn.addEventListener('click', () => show(current + 1));
+
+    function onKey(e) {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); show(current - 1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); show(current + 1); }
+    }
+    document.addEventListener('keydown', onKey);
+    viewer.addEventListener('keydown', onKey);
+
+    deleteBtn.addEventListener('click', function () {
+        const t = thumbs[current];
+        if (!confirm('Удалить файл «' + t.dataset.deleteName + '»?')) return;
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = t.dataset.deleteUrl;
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = '_token'; inp.value = t.dataset.deleteToken;
+        form.appendChild(inp);
+        document.body.appendChild(form);
+        form.submit();
+    });
+
+    show(0);
+})();
+</script>
 {% endblock %}
