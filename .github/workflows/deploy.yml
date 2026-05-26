@@ -41,6 +41,7 @@ jobs:
             docker compose down --remove-orphans
             docker compose build
             docker compose up -d --remove-orphans
+            docker compose exec -T php mkdir -p var/uploads/photos var/uploads/books/covers var/uploads/documents
             docker compose exec -T php composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
             docker compose exec -T php bin/console doctrine:migrations:migrate -n
             docker compose exec -T php bin/console cache:clear
